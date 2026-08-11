@@ -13,24 +13,49 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [waking, setWaking] = useState(false);
 
   useEffect(() => {
+    const onWaking = () => setWaking(true);
+    window.addEventListener('wt:server-waking', onWaking);
+
     api
       .get('/dashboard/summary')
       .then((res) => setData(res.data))
       .catch((err) => setError(err.response?.data?.message || 'Failed to load dashboard'))
-      .finally(() => setLoading(false));
+      .finally(() => {
+        setLoading(false);
+        setWaking(false);
+      });
+
+    return () => window.removeEventListener('wt:server-waking', onWaking);
   }, []);
 
-  if (loading) return <div className="text-slate-400 text-sm">Loading dashboard...</div>;
-  if (error) return <div className="text-red-500 text-sm">{error}</div>;
+  if (loading) {
+    return (
+      <div className="text-sm text-slate-400">
+        {waking
+          ? 'Server is waking up (free tier can take up to a minute after being idle)... retrying automatically.'
+          : 'Loading dashboard...'}
+      </div>
+    );
+  }
+  if (error) {
+    return (
+      <div className="space-y-2">
+        <div className="text-red-500 text-sm">{error}</div>
+        <button onClick={() => window.location.reload()} className="btn-secondary text-sm">
+          Retry
+        </button>
+      </div>
+    );
+  }
   if (!data) return null;
 
   const { cards, charts } = data;
 
   return (
     <div className="space-y-6">
-      {/* Top summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
         <StatCard label="Total Expected" value={formatKES(cards.totalExpected)} />
         <StatCard label="Total Paid" value={formatKES(cards.totalPaid)} accent="text-brand-600" />
@@ -40,14 +65,13 @@ export default function Dashboard() {
           value={formatKES(cards.workCompletedNotPaid)}
           accent="text-red-600"
         />
-        <StatCard label="Total Jobs" value={cards.totalCallouts} />
+        <StatCard label="Total Jobs" value={cards.totalJobs} />
         <StatCard label="Total Callouts" value={cards.totalCallouts} />
         <StatCard label="Sites Visited" value={cards.sitesVisited} />
         <StatCard label="M-PESA Payments" value={cards.mpesaPayments} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        {/* Monthly expected vs paid */}
         <div className="card">
           <div className="font-semibold text-ink-900 mb-4">Monthly Expected vs Paid</div>
           <ResponsiveContainer width="100%" height={260}>
@@ -63,7 +87,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Callouts by month */}
         <div className="card">
           <div className="font-semibold text-ink-900 mb-4">Callouts by Month</div>
           <ResponsiveContainer width="100%" height={260}>
@@ -77,7 +100,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Earnings by client */}
         <div className="card">
           <div className="font-semibold text-ink-900 mb-4">Earnings by Client</div>
           <ResponsiveContainer width="100%" height={260}>
@@ -91,7 +113,6 @@ export default function Dashboard() {
           </ResponsiveContainer>
         </div>
 
-        {/* Nairobi vs outside */}
         <div className="card">
           <div className="font-semibold text-ink-900 mb-4">Nairobi vs Outside Nairobi (Fare)</div>
           <ResponsiveContainer width="100%" height={260}>
