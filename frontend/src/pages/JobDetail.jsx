@@ -27,9 +27,25 @@ export default function JobDetail() {
 
   return (
     <div className="space-y-4">
-      <button onClick={() => navigate('/jobs')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-ink-900">
-        <ArrowLeft size={16} /> Back to Jobs
-      </button>
+      <div className="flex items-center justify-between">
+        <button onClick={() => navigate('/jobs')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-ink-900">
+          <ArrowLeft size={16} /> Back to Jobs
+        </button>
+        <button
+          onClick={async () => {
+            if (!confirm('Delete this job? This also removes its attendance records and payment allocations. Uploaded documents will be kept but unlinked.')) return;
+            try {
+              await api.delete(`/jobs/${job._id}`);
+              navigate('/jobs');
+            } catch (err) {
+              alert(err.response?.data?.message || 'Failed to delete job');
+            }
+          }}
+          className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700"
+        >
+          <Trash2 size={15} /> Delete Job
+        </button>
+      </div>
 
       <div className="card">
         <div className="flex flex-wrap items-start justify-between gap-3">
