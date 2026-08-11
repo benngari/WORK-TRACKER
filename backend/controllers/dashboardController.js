@@ -5,12 +5,40 @@ const Payment = require('../models/Payment');
 const MpesaTransaction = require('../models/MpesaTransaction');
 const Transport = require('../models/Transport');
 const Site = require('../models/Site');
-const { computeJobFinancials } = require('./jobController');
 
 exports.summary = async (req, res) => {
   try {
     const ownerFilter = { owner: req.user.id };
     const jobs = await Job.find(ownerFilter).populate('client').populate('site');
+    const jobIds = jobs.map((j) => j._id);
+
+    // Fetch everything needed in a handful of batched queries instead of
+    // querying per job (which is what made this slow with many jobs).
+    const [allAttendance, allAllocations, payments, mpesaCount, transportAgg, nairobiAgg] = await Promise.all([
+      Attendance.find({ job: { $in: jobIds }, owner: req.user.id }),
+      PaymentAllocation.find({ job: { $in: jobIds }, owner: req.user.id }),
+      Payment.find(ownerFilter),
+      MpesaTransaction.countDocuments(ownerFilter),
+      Transport.aggregate([
+        { $match: { owner: req.user.id } },
+        { $group: { _id: null, totalFare: { $sum: '$fare' } } },
+      ]),
+      Transport.aggregate([
+        { $match: { owner: req.user.id } },
+        { $group: { _id: '$zone', total: { $sum: '$fare' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    const attendanceByJob = {};
+    for (const a of allAttendance) {
+      const key = String(a.job);
+      (attendanceByJob[key] = attendanceByJob[key] || []).push(a);
+    }
+    const paidByJob = {};
+    for (const a of allAllocations) {
+      const key = String(a.job);
+      paidByJob[key] = (paidByJob[key] || 0) + a.amount;
+    }
 
     let totalExpected = 0;
     let totalPaid = 0;
@@ -19,21 +47,25 @@ exports.summary = async (req, res) => {
     const byClient = {};
     const bySite = {};
     const byBank = {};
-    const byMonth = {}; // "2026-08" -> { expected, paid }
+    const byMonth = {};
 
     for (const job of jobs) {
-      const fin = await computeJobFinancials(job);
-      totalExpected += fin.expected;
-      totalPaid += fin.paid;
-      totalCallouts += fin.attendanceCount;
-      if (fin.outstanding > 0 && job.status === 'Completed') {
-        workCompletedNotPaid += fin.outstanding;
+      const jobAttendance = attendanceByJob[String(job._id)] || [];
+      const expected = job.expectedPaymentOverride ?? jobAttendance.length * job.rate;
+      const paid = paidByJob[String(job._id)] || 0;
+      const outstanding = Math.max(0, expected - paid);
+
+      totalExpected += expected;
+      totalPaid += paid;
+      totalCallouts += jobAttendance.length;
+      if (outstanding > 0 && job.status === 'Completed') {
+        workCompletedNotPaid += outstanding;
       }
 
       const clientName = job.client?.name || 'Unknown';
       byClient[clientName] = byClient[clientName] || { expected: 0, paid: 0 };
-      byClient[clientName].expected += fin.expected;
-      byClient[clientName].paid += fin.paid;
+      byClient[clientName].expected += expected;
+      byClient[clientName].paid += paid;
 
       const siteLabel = job.site
         ? job.site.siteType === 'Bank'
@@ -41,17 +73,16 @@ exports.summary = async (req, res) => {
           : job.site.siteName
         : 'Unknown Site';
       bySite[siteLabel] = bySite[siteLabel] || { expected: 0, paid: 0 };
-      bySite[siteLabel].expected += fin.expected;
-      bySite[siteLabel].paid += fin.paid;
+      bySite[siteLabel].expected += expected;
+      bySite[siteLabel].paid += paid;
 
       if (job.site?.siteType === 'Bank' && job.site.bankName) {
         byBank[job.site.bankName] = byBank[job.site.bankName] || { expected: 0, paid: 0 };
-        byBank[job.site.bankName].expected += fin.expected;
-        byBank[job.site.bankName].paid += fin.paid;
+        byBank[job.site.bankName].expected += expected;
+        byBank[job.site.bankName].paid += paid;
       }
 
-      // distribute expected/paid across attendance months for the "monthly" chart
-      for (const a of fin.attendance) {
+      for (const a of jobAttendance) {
         const key = `${a.date.getFullYear()}-${String(a.date.getMonth() + 1).padStart(2, '0')}`;
         byMonth[key] = byMonth[key] || { expected: 0, paid: 0, callouts: 0 };
         byMonth[key].expected += job.rate;
@@ -59,9 +90,6 @@ exports.summary = async (req, res) => {
       }
     }
 
-    // Spread paid amounts across months isn't exact without per-allocation dates,
-    // so approximate monthly "paid" using actual payment received dates instead.
-    const payments = await Payment.find(ownerFilter);
     for (const p of payments) {
       const key = `${p.receivedDate.getFullYear()}-${String(p.receivedDate.getMonth() + 1).padStart(2, '0')}`;
       byMonth[key] = byMonth[key] || { expected: 0, paid: 0, callouts: 0 };
@@ -72,30 +100,17 @@ exports.summary = async (req, res) => {
       _id: { $in: jobs.map((j) => j.site?._id).filter(Boolean) },
     });
 
-    const mpesaCount = await MpesaTransaction.countDocuments(ownerFilter);
-
-    const transportAgg = await Transport.aggregate([
-      { $match: { owner: req.user.id } },
-      { $group: { _id: null, totalFare: { $sum: '$fare' } } },
-    ]);
-    const totalFare = transportAgg[0]?.totalFare || 0;
-
-    const nairobiAgg = await Transport.aggregate([
-      { $match: { owner: req.user.id } },
-      { $group: { _id: '$zone', total: { $sum: '$fare' }, count: { $sum: 1 } } },
-    ]);
-
     res.json({
       cards: {
         totalExpected,
         totalPaid,
         totalOutstanding: Math.max(0, totalExpected - totalPaid),
         workCompletedNotPaid,
-        totalJobs: jobs.length,
+        totalJobs: totalCallouts,
         totalCallouts,
         sitesVisited,
         mpesaPayments: mpesaCount,
-        totalFare,
+        totalFare: transportAgg[0]?.totalFare || 0,
       },
       charts: {
         monthly: Object.entries(byMonth)
