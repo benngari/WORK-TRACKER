@@ -18,6 +18,7 @@ import Reports from './pages/Reports.jsx';
 import HistoricalRecords from './pages/HistoricalRecords.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import AttendanceHistory from './pages/AttendanceHistory.jsx';
+import Trash from './pages/Trash.jsx';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -52,6 +53,7 @@ export default function App() {
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="reports" element={<Reports />} />
         <Route path="historical" element={<HistoricalRecords />} />
+        <Route path="trash" element={<Trash />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

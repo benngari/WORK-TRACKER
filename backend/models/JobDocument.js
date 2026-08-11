@@ -15,6 +15,7 @@ const jobDocumentSchema = new mongoose.Schema(
     publicId: { type: String, required: true },
     fileType: { type: String }, // pdf, jpg, png...
     notes: { type: String, trim: true },
+    deletedAt: { type: Date, default: null, index: true },
   },
   { timestamps: true } // uploadDate = createdAt
 );

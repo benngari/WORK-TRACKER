@@ -5,7 +5,7 @@ const { computeJobFinancials } = require('./jobController');
 // Expected | Paid | Balance | Payment Date | Status, with filters.
 exports.ledger = async (req, res) => {
   try {
-    const filter = { owner: req.user.id };
+    const filter = { owner: req.user.id, deletedAt: null };
     if (req.query.client) filter.client = req.query.client;
     if (req.query.site) filter.site = req.query.site;
     if (req.query.status) filter.paymentStatus = req.query.status;
@@ -50,7 +50,7 @@ exports.ledger = async (req, res) => {
 // Powers "Money Owed To Me": only jobs with outstanding > 0
 exports.outstanding = async (req, res) => {
   try {
-    const jobs = await Job.find({ owner: req.user.id }).populate('client').populate('site');
+    const jobs = await Job.find({ owner: req.user.id, deletedAt: null }).populate('client').populate('site');
     const rows = await Promise.all(
       jobs.map(async (job) => {
         const fin = await computeJobFinancials(job);

@@ -35,7 +35,7 @@ exports.summary = async (req, res) => {
     if (!client) return res.status(404).json({ message: 'Not found' });
 
     const sites = await Site.find({ client: client._id, owner: req.user.id }).sort({ bankName: 1, branch: 1 });
-    const jobs = await Job.find({ client: client._id, owner: req.user.id }).populate('site');
+    const jobs = await Job.find({ client: client._id, owner: req.user.id, deletedAt: null }).populate('site');
 
     res.json({ client, sites, jobs });
   } catch (err) {

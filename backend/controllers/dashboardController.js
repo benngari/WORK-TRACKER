@@ -9,7 +9,7 @@ const Site = require('../models/Site');
 exports.summary = async (req, res) => {
   try {
     const ownerFilter = { owner: req.user.id };
-    const jobs = await Job.find(ownerFilter).populate('client').populate('site');
+    const jobs = await Job.find({ ...ownerFilter, deletedAt: null }).populate('client').populate('site');
     const jobIds = jobs.map((j) => j._id);
 
     // Fetch everything needed in a handful of batched queries instead of

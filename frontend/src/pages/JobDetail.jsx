@@ -33,7 +33,7 @@ export default function JobDetail() {
         </button>
         <button
           onClick={async () => {
-            if (!confirm('Delete this job? This also removes its attendance records and payment allocations. Uploaded documents will be kept but unlinked.')) return;
+            if (!confirm('Move this job to Trash? Its documents will move with it. You can restore both later from the Trash page.')) return;
             try {
               await api.delete(`/jobs/${job._id}`);
               navigate('/jobs');
@@ -43,7 +43,7 @@ export default function JobDetail() {
           }}
           className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700"
         >
-          <Trash2 size={15} /> Delete Job
+          <Trash2 size={15} /> Move to Trash
         </button>
       </div>
 

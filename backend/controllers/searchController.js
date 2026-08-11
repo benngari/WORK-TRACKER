@@ -29,6 +29,7 @@ exports.search = async (req, res) => {
 
     const jobs = await Job.find({
       ...ownerFilter,
+      deletedAt: null,
       $or: [{ jobCardRef: regex }, { jobType: regex }, { description: regex }],
     })
       .populate('client')
@@ -46,7 +47,7 @@ exports.search = async (req, res) => {
     let relatedJobs = [];
     if (matchingClientIds.length) {
       relatedSites = await Site.find({ owner: req.user.id, client: { $in: matchingClientIds } }).populate('client').limit(25);
-      relatedJobs = await Job.find({ owner: req.user.id, client: { $in: matchingClientIds } }).populate('client').populate('site').limit(25);
+      relatedJobs = await Job.find({ owner: req.user.id, client: { $in: matchingClientIds }, deletedAt: null }).populate('client').populate('site').limit(25);
     }
 
     const dedupe = (arr) => Array.from(new Map(arr.map((i) => [String(i._id), i])).values());

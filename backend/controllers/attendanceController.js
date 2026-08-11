@@ -21,7 +21,7 @@ exports.list = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
-    const job = await Job.findOne({ _id: req.body.job, owner: req.user.id });
+    const job = await Job.findOne({ _id: req.body.job, owner: req.user.id, deletedAt: null });
     if (!job) return res.status(404).json({ message: 'Job not found' });
 
     const record = await Attendance.create({

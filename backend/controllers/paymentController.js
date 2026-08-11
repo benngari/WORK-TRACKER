@@ -44,7 +44,7 @@ exports.allocate = async (req, res) => {
     const payment = await Payment.findOne({ _id: req.params.id, owner: req.user.id });
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
 
-    const job = await Job.findOne({ _id: jobId, owner: req.user.id });
+    const job = await Job.findOne({ _id: jobId, owner: req.user.id, deletedAt: null });
     if (!job) return res.status(404).json({ message: 'Job not found' });
 
     const existingAllocations = await PaymentAllocation.find({ payment: payment._id });

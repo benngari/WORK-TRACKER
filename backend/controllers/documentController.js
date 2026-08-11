@@ -3,7 +3,7 @@ const { cloudinary } = require('../config/cloudinary');
 
 exports.list = async (req, res) => {
   try {
-    const filter = { owner: req.user.id };
+    const filter = { owner: req.user.id, deletedAt: null };
     if (req.query.job) filter.job = req.query.job;
     if (req.query.category) filter.category = req.query.category;
     if (req.query.standalone === 'true') filter.job = null;

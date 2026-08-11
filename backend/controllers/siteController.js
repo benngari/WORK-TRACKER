@@ -18,7 +18,7 @@ exports.history = async (req, res) => {
     const site = await Site.findOne({ _id: req.params.id, owner: req.user.id }).populate('client');
     if (!site) return res.status(404).json({ message: 'Not found' });
 
-    const jobs = await Job.find({ site: site._id, owner: req.user.id }).sort({ createdAt: -1 });
+    const jobs = await Job.find({ site: site._id, owner: req.user.id, deletedAt: null }).sort({ createdAt: -1 });
     const jobIds = jobs.map((j) => j._id);
 
     const attendance = await Attendance.find({ job: { $in: jobIds }, owner: req.user.id }).sort({ date: 1 });

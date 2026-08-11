@@ -12,6 +12,7 @@ import {
   CalendarDays,
   BarChart3,
   Archive,
+  Trash2,
   Settings,
   Wallet,
 } from 'lucide-react';
@@ -29,6 +30,7 @@ const navItems = [
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/historical', label: 'Historical Records', icon: Archive },
+  { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

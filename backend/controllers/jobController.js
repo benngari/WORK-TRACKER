@@ -2,11 +2,8 @@ const Job = require('../models/Job');
 const Attendance = require('../models/Attendance');
 const PaymentAllocation = require('../models/PaymentAllocation');
 const JobDocument = require('../models/JobDocument');
+const { cloudinary } = require('../config/cloudinary');
 
-// Computes expected/paid/outstanding + status for a single job document.
-// Expected = manual override if set, else (number of attendance records * job.rate)
-// Paid = sum of payment allocations for this job
-// Outstanding = max(0, Expected - Paid)
 async function computeJobFinancials(job) {
   const attendance = await Attendance.find({ job: job._id });
   const allocations = await PaymentAllocation.find({ job: job._id });
@@ -20,32 +17,21 @@ async function computeJobFinancials(job) {
   else if (paid === expected && expected > 0) paymentStatus = 'Paid';
   else if (paid > expected) paymentStatus = 'Overpaid';
 
-  return {
-    attendanceCount: attendance.length,
-    expected,
-    paid,
-    outstanding,
-    paymentStatus,
-    attendance,
-  };
+  return { attendanceCount: attendance.length, expected, paid, outstanding, paymentStatus, attendance };
 }
 
 exports.list = async (req, res) => {
   try {
-    const filter = { owner: req.user.id };
+    const filter = { owner: req.user.id, deletedAt: null };
     if (req.query.client) filter.client = req.query.client;
     if (req.query.site) filter.site = req.query.site;
     if (req.query.status) filter.status = req.query.status;
 
-    const jobs = await Job.find(filter)
-      .populate('client')
-      .populate('site')
-      .sort({ createdAt: -1 });
+    const jobs = await Job.find(filter).populate('client').populate('site').sort({ createdAt: -1 });
 
     const withFinancials = await Promise.all(
       jobs.map(async (job) => {
         const fin = await computeJobFinancials(job);
-        // Keep paymentStatus in sync with actual allocations
         if (job.paymentStatus !== fin.paymentStatus) {
           job.paymentStatus = fin.paymentStatus;
           await job.save();
@@ -60,15 +46,27 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.trash = async (req, res) => {
+  try {
+    const jobs = await Job.find({ owner: req.user.id, deletedAt: { $ne: null } })
+      .populate('client')
+      .populate('site')
+      .sort({ deletedAt: -1 });
+    res.json(jobs);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch trash', error: err.message });
+  }
+};
+
 exports.getOne = async (req, res) => {
   try {
-    const job = await Job.findOne({ _id: req.params.id, owner: req.user.id })
+    const job = await Job.findOne({ _id: req.params.id, owner: req.user.id, deletedAt: null })
       .populate('client')
       .populate('site');
     if (!job) return res.status(404).json({ message: 'Not found' });
 
     const fin = await computeJobFinancials(job);
-    const documents = await JobDocument.find({ job: job._id }).sort({ createdAt: -1 });
+    const documents = await JobDocument.find({ job: job._id, deletedAt: null }).sort({ createdAt: -1 });
     const allocations = await PaymentAllocation.find({ job: job._id }).populate({
       path: 'payment',
       populate: { path: 'mpesaTransaction' },
@@ -92,7 +90,7 @@ exports.create = async (req, res) => {
 exports.update = async (req, res) => {
   try {
     const job = await Job.findOneAndUpdate(
-      { _id: req.params.id, owner: req.user.id },
+      { _id: req.params.id, owner: req.user.id, deletedAt: null },
       req.body,
       { new: true, runValidators: true }
     );
@@ -103,16 +101,61 @@ exports.update = async (req, res) => {
   }
 };
 
+// Soft delete: moves the job (and its documents) to Trash instead of
+// permanently removing them, so they can be restored later.
 exports.remove = async (req, res) => {
   try {
-    const job = await Job.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
+    const job = await Job.findOne({ _id: req.params.id, owner: req.user.id, deletedAt: null });
     if (!job) return res.status(404).json({ message: 'Not found' });
-    await Attendance.deleteMany({ job: job._id });
-    await PaymentAllocation.deleteMany({ job: job._id });
-    await JobDocument.updateMany({ job: job._id }, { job: null }); // keep documents, unlink
-    res.json({ message: 'Deleted' });
+
+    job.deletedAt = new Date();
+    await job.save();
+    await JobDocument.updateMany({ job: job._id, owner: req.user.id }, { deletedAt: new Date() });
+
+    res.json({ message: 'Moved to Trash' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to delete job', error: err.message });
+  }
+};
+
+exports.restore = async (req, res) => {
+  try {
+    const job = await Job.findOne({ _id: req.params.id, owner: req.user.id, deletedAt: { $ne: null } });
+    if (!job) return res.status(404).json({ message: 'Not found in Trash' });
+
+    job.deletedAt = null;
+    await job.save();
+    await JobDocument.updateMany({ job: job._id, owner: req.user.id }, { deletedAt: null });
+
+    res.json({ message: 'Restored' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to restore job', error: err.message });
+  }
+};
+
+// Permanent delete: only allowed from Trash. Removes the job, its
+// attendance, payment allocations, and documents (including from Cloudinary).
+exports.permanentRemove = async (req, res) => {
+  try {
+    const job = await Job.findOne({ _id: req.params.id, owner: req.user.id, deletedAt: { $ne: null } });
+    if (!job) return res.status(404).json({ message: 'Job must be in Trash before it can be permanently deleted' });
+
+    const documents = await JobDocument.find({ job: job._id, owner: req.user.id });
+    for (const doc of documents) {
+      try {
+        await cloudinary.uploader.destroy(doc.publicId, { resource_type: 'auto' });
+      } catch (cloudErr) {
+        console.warn('Cloudinary delete warning:', cloudErr.message);
+      }
+    }
+    await JobDocument.deleteMany({ job: job._id, owner: req.user.id });
+    await Attendance.deleteMany({ job: job._id, owner: req.user.id });
+    await PaymentAllocation.deleteMany({ job: job._id, owner: req.user.id });
+    await job.deleteOne();
+
+    res.json({ message: 'Permanently deleted' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to permanently delete job', error: err.message });
   }
 };
 
