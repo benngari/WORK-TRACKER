@@ -40,7 +40,7 @@ export default function Dashboard() {
           value={formatKES(cards.workCompletedNotPaid)}
           accent="text-red-600"
         />
-        <StatCard label="Total Jobs" value={cards.totalJobs} />
+        <StatCard label="Total Jobs" value={cards.totalCallouts} />
         <StatCard label="Total Callouts" value={cards.totalCallouts} />
         <StatCard label="Sites Visited" value={cards.sitesVisited} />
         <StatCard label="M-PESA Payments" value={cards.mpesaPayments} />
