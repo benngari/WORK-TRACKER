@@ -4,11 +4,12 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { formatKES, siteLabel, formatDate } from '../utils/format.js';
+import { formatKES, siteLabel } from '../utils/format.js';
 
 const emptyForm = {
   client: '', site: '', jobCardRef: '', jobType: '', description: '',
   status: 'Open', rate: 1500, paymentDueDate: '', notes: '',
+  date: new Date().toISOString().slice(0, 10), fare: 0,
 };
 
 export default function Jobs() {
@@ -46,7 +47,18 @@ export default function Jobs() {
     setSaving(true);
     setError('');
     try {
-      await api.post('/jobs', form);
+      const { client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes } = form;
+      const { data: job } = await api.post('/jobs', {
+        client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes,
+      });
+
+      await api.post('/attendance', {
+        job: job._id,
+        date: form.date,
+        rate: form.rate,
+        fare: form.fare,
+      });
+
       setModalOpen(false);
       setForm(emptyForm);
       load();
@@ -144,6 +156,22 @@ export default function Jobs() {
               </select>
             </div>
           </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            <div>
+              <label className="label">Date of Visit</label>
+              <input required type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Rate (KES)</label>
+              <input type="number" className="input" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
+            </div>
+            <div>
+              <label className="label">Fare (KES)</label>
+              <input type="number" className="input" value={form.fare} onChange={(e) => setForm({ ...form, fare: Number(e.target.value) })} />
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Job Card / Reference</label>
@@ -158,7 +186,7 @@ export default function Jobs() {
             <label className="label">Description</label>
             <textarea className="input" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
           </div>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Status</label>
               <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
@@ -167,10 +195,6 @@ export default function Jobs() {
                 <option>Completed</option>
                 <option>Cancelled</option>
               </select>
-            </div>
-            <div>
-              <label className="label">Rate (KES/callout)</label>
-              <input type="number" className="input" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
             </div>
             <div>
               <label className="label">Payment Due Date</label>
