@@ -133,17 +133,51 @@ function Row({ label, value }) {
 
 function AttendanceTab({ job, onChange }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [form, setForm] = useState({ date: '', startTime: '', endTime: '', shift: 'Day', rate: job.rate, fare: 0, notes: '' });
+  const [editingId, setEditingId] = useState(null);
+  const [form, setForm] = useState(emptyAttendanceForm(job.rate));
+  const [fareNeeded, setFareNeeded] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleAdd = async (e) => {
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(emptyAttendanceForm(job.rate));
+    setFareNeeded(false);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEdit = (a) => {
+    setEditingId(a._id);
+    setForm({
+      date: a.date ? a.date.slice(0, 10) : '',
+      startTime: a.startTime || '',
+      endTime: a.endTime || '',
+      shift: a.shift || 'Day',
+      rate: a.rate,
+      fare: a.fare || 0,
+      notes: a.notes || '',
+    });
+    setFareNeeded((a.fare || 0) > 0);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
+    setError('');
+    const payload = { ...form, fare: fareNeeded ? form.fare : 0 };
     try {
-      await api.post('/attendance', { ...form, job: job._id });
+      if (editingId) {
+        await api.put(`/attendance/${editingId}`, payload);
+      } else {
+        await api.post('/attendance', { ...payload, job: job._id });
+      }
       setModalOpen(false);
-      setForm({ date: '', startTime: '', endTime: '', shift: 'Day', rate: job.rate, fare: 0, notes: '' });
       onChange();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save attendance');
     } finally {
       setSaving(false);
     }
@@ -158,7 +192,7 @@ function AttendanceTab({ job, onChange }) {
   return (
     <div className="space-y-3">
       <div className="flex justify-end">
-        <button onClick={() => setModalOpen(true)} className="btn-primary flex items-center gap-1.5 text-sm">
+        <button onClick={openAdd} className="btn-primary flex items-center gap-1.5 text-sm">
           <Plus size={15} /> Record Attendance
         </button>
       </div>
@@ -170,7 +204,7 @@ function AttendanceTab({ job, onChange }) {
               <th className="py-2.5 px-4">Time</th>
               <th className="py-2.5 px-4">Shift</th>
               <th className="py-2.5 px-4">Rate</th>
-              <th className="py-2.5 px-4">Fare</th>
+              <th className="py-2.5 px-4">Fare Needed?</th>
               <th className="py-2.5 px-4"></th>
             </tr>
           </thead>
@@ -181,9 +215,16 @@ function AttendanceTab({ job, onChange }) {
                 <td className="py-2 px-4 text-slate-500">{a.startTime || '-'}{a.endTime ? ` - ${a.endTime}` : ''}</td>
                 <td className="py-2 px-4 text-slate-500">{a.shift}</td>
                 <td className="py-2 px-4 text-slate-500">{formatKES(a.rate)}</td>
-                <td className="py-2 px-4 text-slate-500">{formatKES(a.fare)}</td>
-                <td className="py-2 px-4 text-right">
-                  <button onClick={() => handleDelete(a._id)} className="text-slate-300 hover:text-red-500">
+                <td className="py-2 px-4">
+                  {a.fare > 0 ? (
+                    <span className="text-ink-800">Yes — {formatKES(a.fare)}</span>
+                  ) : (
+                    <span className="text-slate-400">No</span>
+                  )}
+                </td>
+                <td className="py-2 px-4 text-right whitespace-nowrap">
+                  <button onClick={() => openEdit(a)} className="text-brand-600 text-xs font-medium mr-3">Edit</button>
+                  <button onClick={() => handleDelete(a._id)} className="text-slate-300 hover:text-red-500 inline-block align-middle">
                     <Trash2 size={15} />
                   </button>
                 </td>
@@ -198,8 +239,9 @@ function AttendanceTab({ job, onChange }) {
         )}
       </div>
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Record Attendance">
-        <form onSubmit={handleAdd} className="space-y-3">
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit Attendance' : 'Record Attendance'}>
+        <form onSubmit={handleSubmit} className="space-y-3">
+          {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
           <div>
             <label className="label">Date</label>
             <input required type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
@@ -227,19 +269,47 @@ function AttendanceTab({ job, onChange }) {
               <input type="number" className="input" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
             </div>
           </div>
-          <div>
-            <label className="label">Fare (KES)</label>
-            <input type="number" className="input" value={form.fare} onChange={(e) => setForm({ ...form, fare: Number(e.target.value) })} />
+
+          <div className="border border-slate-200 rounded-lg p-3 space-y-2">
+            <label className="flex items-center gap-2 text-sm font-medium text-ink-800">
+              <input
+                type="checkbox"
+                checked={fareNeeded}
+                onChange={(e) => {
+                  setFareNeeded(e.target.checked);
+                  if (!e.target.checked) setForm({ ...form, fare: 0 });
+                }}
+              />
+              Was fare needed for this job?
+            </label>
+            {fareNeeded && (
+              <div>
+                <label className="label">Fare Amount (KES)</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={form.fare}
+                  onChange={(e) => setForm({ ...form, fare: Number(e.target.value) })}
+                />
+              </div>
+            )}
           </div>
+
           <div>
             <label className="label">Notes</label>
             <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
-          <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Save Attendance'}</button>
+          <button disabled={saving} className="btn-primary w-full">
+            {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Save Attendance'}
+          </button>
         </form>
       </Modal>
     </div>
   );
+}
+
+function emptyAttendanceForm(rate) {
+  return { date: '', startTime: '', endTime: '', shift: 'Day', rate, fare: 0, notes: '' };
 }
 
 function PaymentsTab({ job, onChange }) {
