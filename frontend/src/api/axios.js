@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  timeout: 20000,
+  timeout: 15000,
 });
 
 api.interceptors.request.use((config) => {
@@ -11,10 +11,7 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// Render's free tier sleeps after ~15 min idle. Waking it back up can take
-// 30-60 seconds, so a request sent right then can fail with no response at
-// all rather than a normal error. Retry with growing delays to ride it out.
-const RETRY_DELAYS_MS = [3000, 6000, 10000, 15000, 20000]; // ~54s total coverage
+const RETRY_DELAYS_MS = [3000, 6000]; // ~9s of waiting, plus the two 15s timeouts = ~24s max
 
 api.interceptors.response.use(
   (res) => res,

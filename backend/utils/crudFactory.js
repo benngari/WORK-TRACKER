@@ -1,10 +1,8 @@
-// Small helper to avoid repeating identical CRUD boilerplate across
-// simple owner-scoped models (Client, Site, Transport, HistoricalRecord...).
 function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) {
   return {
     list: async (req, res) => {
       try {
-        let query = Model.find({ owner: req.user.id }).sort(sort);
+        let query = Model.find({ owner: req.user.id }).sort(sort).lean();
         if (populate) query = query.populate(populate);
         const items = await query;
         res.json(items);
@@ -15,7 +13,7 @@ function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) 
 
     getOne: async (req, res) => {
       try {
-        let query = Model.findOne({ _id: req.params.id, owner: req.user.id });
+        let query = Model.findOne({ _id: req.params.id, owner: req.user.id }).lean();
         if (populate) query = query.populate(populate);
         const item = await query;
         if (!item) return res.status(404).json({ message: 'Not found' });
