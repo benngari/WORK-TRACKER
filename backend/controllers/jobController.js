@@ -4,6 +4,45 @@ const PaymentAllocation = require('../models/PaymentAllocation');
 const JobDocument = require('../models/JobDocument');
 const { cloudinary } = require('../config/cloudinary');
 
+// Batch-computes financials for many jobs in ONE pair of queries total,
+// instead of 2 queries per job. This is what keeps Jobs, Payment Ledger,
+// and Outstanding Payments fast even with many jobs.
+async function batchComputeFinancials(jobs, ownerId) {
+  const jobIds = jobs.map((j) => j._id);
+  const [allAttendance, allAllocations] = await Promise.all([
+    Attendance.find({ job: { $in: jobIds }, owner: ownerId }).lean(),
+    PaymentAllocation.find({ job: { $in: jobIds }, owner: ownerId }).lean(),
+  ]);
+
+  const attendanceByJob = {};
+  for (const a of allAttendance) {
+    const key = String(a.job);
+    (attendanceByJob[key] = attendanceByJob[key] || []).push(a);
+  }
+  const paidByJob = {};
+  for (const a of allAllocations) {
+    const key = String(a.job);
+    paidByJob[key] = (paidByJob[key] || 0) + a.amount;
+  }
+
+  return jobs.map((job) => {
+    const jobAttendance = attendanceByJob[String(job._id)] || [];
+    const paid = paidByJob[String(job._id)] || 0;
+    const expected = job.expectedPaymentOverride ?? jobAttendance.length * job.rate;
+    const outstanding = Math.max(0, expected - paid);
+
+    let paymentStatus = 'Pending';
+    if (paid === 0 && expected > 0) paymentStatus = 'Pending';
+    else if (paid > 0 && paid < expected) paymentStatus = 'Partially Paid';
+    else if (paid === expected && expected > 0) paymentStatus = 'Paid';
+    else if (paid > expected) paymentStatus = 'Overpaid';
+
+    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, outstanding, paymentStatus };
+  });
+}
+
+// Single-job version, used by the job detail page and other controllers
+// that only need one job's numbers at a time.
 async function computeJobFinancials(job) {
   const attendance = await Attendance.find({ job: job._id });
   const allocations = await PaymentAllocation.find({ job: job._id });
@@ -27,20 +66,15 @@ exports.list = async (req, res) => {
     if (req.query.site) filter.site = req.query.site;
     if (req.query.status) filter.status = req.query.status;
 
-    const jobs = await Job.find(filter).populate('client').populate('site').sort({ createdAt: -1 });
+    const jobs = await Job.find(filter).populate('client').populate('site').sort({ createdAt: -1 }).lean();
+    const withFinancials = await batchComputeFinancials(jobs, req.user.id);
 
-    const withFinancials = await Promise.all(
-      jobs.map(async (job) => {
-        const fin = await computeJobFinancials(job);
-        if (job.paymentStatus !== fin.paymentStatus) {
-          job.paymentStatus = fin.paymentStatus;
-          await job.save();
-        }
-        return { ...job.toObject(), ...fin, attendance: undefined };
+    res.json(
+      withFinancials.map((j) => {
+        const dates = (j.attendance || []).map((a) => a.date).sort((a, b) => new Date(a) - new Date(b));
+        return { ...j, date: dates[0] || j.createdAt, attendance: undefined };
       })
     );
-
-    res.json(withFinancials);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch jobs', error: err.message });
   }
@@ -51,7 +85,8 @@ exports.trash = async (req, res) => {
     const jobs = await Job.find({ owner: req.user.id, deletedAt: { $ne: null } })
       .populate('client')
       .populate('site')
-      .sort({ deletedAt: -1 });
+      .sort({ deletedAt: -1 })
+      .lean();
     res.json(jobs);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch trash', error: err.message });
@@ -160,3 +195,4 @@ exports.permanentRemove = async (req, res) => {
 };
 
 exports.computeJobFinancials = computeJobFinancials;
+exports.batchComputeFinancials = batchComputeFinancials;

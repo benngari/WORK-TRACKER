@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { formatKES, siteLabel } from '../utils/format.js';
+import { formatKES, formatDate, siteLabel } from '../utils/format.js';
 
 const emptyForm = {
   client: '', site: '', jobCardRef: '', jobType: '', description: '',
@@ -101,7 +101,8 @@ export default function Jobs() {
         <div className="card overflow-x-auto p-0">
           <table className="w-full text-sm">
             <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
+                            <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
+                <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Client</th>
                 <th className="py-3 px-4">Site</th>
                 <th className="py-3 px-4">Job Card</th>
@@ -119,6 +120,7 @@ export default function Jobs() {
                   className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
                   onClick={() => navigate(`/jobs/${j._id}`)}
                 >
+                                    <td className="py-2.5 px-4 text-slate-600">{formatDate(j.date)}</td>
                   <td className="py-2.5 px-4 font-medium text-ink-900">{j.client?.name}</td>
                   <td className="py-2.5 px-4 text-slate-600">{siteLabel(j.site)}</td>
                   <td className="py-2.5 px-4 text-slate-600">{j.jobCardRef || '-'}</td>
