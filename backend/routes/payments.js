@@ -7,6 +7,7 @@ router.use(auth);
 router.get('/', ctrl.list);
 router.post('/', ctrl.create);
 router.post('/:id/allocate', ctrl.allocate);
+router.put('/allocations/:allocationId', ctrl.updateAllocation);
 router.delete('/allocations/:allocationId', ctrl.removeAllocation);
 router.delete('/:id', ctrl.remove);
 

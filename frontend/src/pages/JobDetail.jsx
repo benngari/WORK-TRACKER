@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Upload, FileText } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2 } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -61,7 +61,6 @@ export default function JobDetail() {
           <Metric label="Paid" value={formatKES(job.paid)} accent="text-brand-600" />
           <Metric label="Outstanding" value={formatKES(job.outstanding)} accent="text-amber-600" />
         </div>
-        {/* Timeline */}
         <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
           {['Job Created', 'Attended', 'Payment Due', 'Matched', 'Paid'].map((step, i) => (
             <div key={step} className="flex items-center gap-2">
@@ -244,29 +243,177 @@ function AttendanceTab({ job, onChange }) {
 }
 
 function PaymentsTab({ job, onChange }) {
+  const [availablePayments, setAvailablePayments] = useState([]);
+  const [loadingPayments, setLoadingPayments] = useState(true);
+  const [selectedPayment, setSelectedPayment] = useState('');
+  const [allocateAmount, setAllocateAmount] = useState(0);
+  const [allocating, setAllocating] = useState(false);
+  const [allocateError, setAllocateError] = useState('');
+
+  const [editingId, setEditingId] = useState(null);
+  const [editAmount, setEditAmount] = useState(0);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editError, setEditError] = useState('');
+
+  const loadAvailablePayments = () => {
+    setLoadingPayments(true);
+    api
+      .get('/payments')
+      .then((res) => setAvailablePayments(res.data.filter((p) => p.unallocated > 0)))
+      .finally(() => setLoadingPayments(false));
+  };
+
+  useEffect(loadAvailablePayments, []);
+
+  useEffect(() => {
+    const payment = availablePayments.find((p) => p._id === selectedPayment);
+    if (payment) {
+      setAllocateAmount(Math.min(payment.unallocated, job.outstanding || payment.unallocated));
+    }
+  }, [selectedPayment]);
+
+  const handleAllocate = async () => {
+    setAllocating(true);
+    setAllocateError('');
+    try {
+      await api.post(`/payments/${selectedPayment}/allocate`, { jobId: job._id, amount: allocateAmount });
+      setSelectedPayment('');
+      setAllocateAmount(0);
+      loadAvailablePayments();
+      onChange();
+    } catch (err) {
+      setAllocateError(err.response?.data?.message || 'Failed to allocate payment');
+    } finally {
+      setAllocating(false);
+    }
+  };
+
+  const startEdit = (allocation) => {
+    setEditingId(allocation._id);
+    setEditAmount(allocation.amount);
+    setEditError('');
+  };
+
+  const saveEdit = async (allocationId) => {
+    setEditSaving(true);
+    setEditError('');
+    try {
+      await api.put(`/payments/allocations/${allocationId}`, { amount: editAmount });
+      setEditingId(null);
+      loadAvailablePayments();
+      onChange();
+    } catch (err) {
+      setEditError(err.response?.data?.message || 'Failed to update allocation');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+
+  const removeAllocation = async (allocationId) => {
+    if (!confirm('Remove this payment allocation from the job? The amount becomes unallocated again.')) return;
+    try {
+      await api.delete(`/payments/allocations/${allocationId}`);
+      loadAvailablePayments();
+      onChange();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Failed to remove allocation');
+    }
+  };
+
   return (
-    <div className="card space-y-3">
-      <div className="text-sm text-slate-500">
-        Payments are recorded from M-PESA messages or manually, then allocated to jobs. Go to
-        <span className="font-medium text-ink-800"> M-PESA Payments </span> or
-        <span className="font-medium text-ink-800"> Payment Ledger </span>
-        to allocate a payment to this job.
-      </div>
-      <div className="divide-y divide-slate-50">
-        {(job.allocations || []).length === 0 && (
-          <div className="text-sm text-slate-400 py-4">No payments allocated to this job yet.</div>
-        )}
-        {(job.allocations || []).map((a) => (
-          <div key={a._id} className="flex justify-between items-center py-2.5 text-sm">
+    <div className="space-y-4">
+      {/* Allocate a payment to this job */}
+      <div className="card space-y-3">
+        <div className="font-semibold text-ink-900 text-sm">Allocate an M-PESA Payment to This Job</div>
+        {allocateError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{allocateError}</div>}
+        {loadingPayments ? (
+          <div className="text-sm text-slate-400">Loading available payments...</div>
+        ) : availablePayments.length === 0 ? (
+          <div className="text-sm text-slate-400">
+            No unallocated M-PESA payments available. Add one from the M-PESA Payments page first.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+            <div className="sm:col-span-2">
+              <label className="label">Payment</label>
+              <select className="input" value={selectedPayment} onChange={(e) => setSelectedPayment(e.target.value)}>
+                <option value="">Select a payment...</option>
+                {availablePayments.map((p) => (
+                  <option key={p._id} value={p._id}>
+                    {p.mpesaTransaction?.transactionCode || p.method} — {formatKES(p.unallocated)} unallocated ({formatDate(p.receivedDate)})
+                  </option>
+                ))}
+              </select>
+            </div>
             <div>
-              <div className="font-medium text-ink-900">{formatKES(a.amount)}</div>
-              <div className="text-xs text-slate-400">
-                {a.payment?.method} · {formatDate(a.payment?.receivedDate)}
-                {a.payment?.mpesaTransaction?.transactionCode ? ` · ${a.payment.mpesaTransaction.transactionCode}` : ''}
-              </div>
+              <label className="label">Amount to Allocate</label>
+              <input
+                type="number"
+                className="input"
+                value={allocateAmount}
+                onChange={(e) => setAllocateAmount(Number(e.target.value))}
+                disabled={!selectedPayment}
+              />
+            </div>
+            <div className="sm:col-span-3">
+              <button
+                onClick={handleAllocate}
+                disabled={!selectedPayment || allocating}
+                className="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5"
+              >
+                <Link2 size={15} /> {allocating ? 'Allocating...' : 'Allocate to This Job'}
+              </button>
             </div>
           </div>
-        ))}
+        )}
+      </div>
+
+      {/* Existing allocations */}
+      <div className="card space-y-3">
+        <div className="font-semibold text-ink-900 text-sm">Payments Allocated to This Job</div>
+        {editError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{editError}</div>}
+        <div className="divide-y divide-slate-50">
+          {(job.allocations || []).length === 0 && (
+            <div className="text-sm text-slate-400 py-4">No payments allocated to this job yet.</div>
+          )}
+          {(job.allocations || []).map((a) => (
+            <div key={a._id} className="flex justify-between items-center py-2.5 text-sm">
+              <div>
+                {editingId === a._id ? (
+                  <input
+                    type="number"
+                    className="input w-32"
+                    value={editAmount}
+                    onChange={(e) => setEditAmount(Number(e.target.value))}
+                  />
+                ) : (
+                  <div className="font-medium text-ink-900">{formatKES(a.amount)}</div>
+                )}
+                <div className="text-xs text-slate-400">
+                  {a.payment?.method} · {formatDate(a.payment?.receivedDate)}
+                  {a.payment?.mpesaTransaction?.transactionCode ? ` · ${a.payment.mpesaTransaction.transactionCode}` : ''}
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                {editingId === a._id ? (
+                  <>
+                    <button onClick={() => saveEdit(a._id)} disabled={editSaving} className="text-brand-600 text-xs font-medium">
+                      {editSaving ? 'Saving...' : 'Save'}
+                    </button>
+                    <button onClick={() => setEditingId(null)} className="text-slate-400 text-xs font-medium">
+                      Cancel
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button onClick={() => startEdit(a)} className="text-brand-600 text-xs font-medium">Edit</button>
+                    <button onClick={() => removeAllocation(a._id)} className="text-red-500 text-xs font-medium">Remove</button>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );

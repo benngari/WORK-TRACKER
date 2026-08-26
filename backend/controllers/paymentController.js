@@ -35,9 +35,6 @@ exports.create = async (req, res) => {
   }
 };
 
-// Allocate an amount from an existing payment to a job (supports splitting one
-// payment across multiple jobs). Keeps MpesaTransaction.allocatedAmount and
-// Job.paymentStatus in sync.
 exports.allocate = async (req, res) => {
   try {
     const { jobId, amount, notes } = req.body;
@@ -75,6 +72,49 @@ exports.allocate = async (req, res) => {
     res.status(201).json({ allocation, jobFinancials: fin });
   } catch (err) {
     res.status(400).json({ message: 'Failed to allocate payment', error: err.message });
+  }
+};
+
+// Change the amount on an existing allocation. Keeps the MpesaTransaction's
+// allocatedAmount and the job's paymentStatus in sync with the correction.
+exports.updateAllocation = async (req, res) => {
+  try {
+    const { amount } = req.body;
+    const allocation = await PaymentAllocation.findOne({ _id: req.params.allocationId, owner: req.user.id });
+    if (!allocation) return res.status(404).json({ message: 'Allocation not found' });
+
+    const payment = await Payment.findById(allocation.payment);
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    const otherAllocations = await PaymentAllocation.find({
+      payment: payment._id,
+      _id: { $ne: allocation._id },
+    });
+    const otherTotal = otherAllocations.reduce((s, a) => s + a.amount, 0);
+    if (amount + otherTotal > payment.amount) {
+      return res.status(400).json({
+        message: `That would exceed the payment total. Only KES ${payment.amount - otherTotal} is available for this allocation.`,
+      });
+    }
+
+    const diff = amount - allocation.amount;
+    allocation.amount = amount;
+    await allocation.save();
+
+    if (payment.mpesaTransaction) {
+      await MpesaTransaction.findByIdAndUpdate(payment.mpesaTransaction, { $inc: { allocatedAmount: diff } });
+    }
+
+    const job = await Job.findOne({ _id: allocation.job, owner: req.user.id, deletedAt: null });
+    if (job) {
+      const fin = await computeJobFinancials(job);
+      job.paymentStatus = fin.paymentStatus;
+      await job.save();
+    }
+
+    res.json({ allocation });
+  } catch (err) {
+    res.status(400).json({ message: 'Failed to update allocation', error: err.message });
   }
 };
 
