@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { formatKES, formatDate, siteLabel } from '../utils/format.js';
+import { formatKES, formatDate, siteLabel, getThumbnailUrl } from '../utils/format.js';
 
 const tabs = ['Overview', 'Attendance', 'Payments', 'Documents', 'Notes'];
 
@@ -55,7 +55,7 @@ export default function JobDetail() {
           </div>
           <StatusBadge status={job.paymentStatus} />
         </div>
-                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4">
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4">
           <Metric label="Callouts" value={job.attendanceCount} />
           <Metric label="Expected" value={formatKES(job.expected)} />
           <Metric label="Paid" value={formatKES(job.paid)} accent="text-brand-600" />
@@ -401,7 +401,6 @@ function PaymentsTab({ job, onChange }) {
 
   return (
     <div className="space-y-4">
-      {/* Allocate a payment to this job */}
       <div className="card space-y-3">
         <div className="font-semibold text-ink-900 text-sm">Allocate an M-PESA Payment to This Job</div>
         {allocateError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{allocateError}</div>}
@@ -470,7 +469,6 @@ function PaymentsTab({ job, onChange }) {
         )}
       </div>
 
-      {/* Existing allocations */}
       <div className="card space-y-3">
         <div className="font-semibold text-ink-900 text-sm">Payments Allocated to This Job</div>
         {editError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{editError}</div>}
@@ -599,17 +597,40 @@ function DocumentsTab({ job, onChange }) {
       </div>
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         {(job.documents || []).map((d) => (
-          <div key={d._id} className="card">
-            <a href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-ink-800 hover:text-brand-600">
-              <FileText size={16} /> <span className="truncate">{d.filename}</span>
-            </a>
-            <div className="text-xs text-slate-400 mt-1">{d.category} · {formatDate(d.createdAt)}</div>
-            <button onClick={() => handleDelete(d._id)} className="text-xs text-red-500 mt-2">Delete</button>
-          </div>
+          <JobDocumentCard key={d._id} doc={d} onDelete={handleDelete} />
         ))}
         {(!job.documents || job.documents.length === 0) && (
           <div className="text-sm text-slate-400 col-span-full py-4">No documents uploaded for this job.</div>
         )}
+      </div>
+    </div>
+  );
+}
+
+function JobDocumentCard({ doc, onDelete }) {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const thumbUrl = getThumbnailUrl(doc.url);
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <a href={doc.url} target="_blank" rel="noreferrer" className="block bg-slate-50 h-28 flex items-center justify-center overflow-hidden">
+        {thumbUrl && !thumbFailed ? (
+          <img
+            src={thumbUrl}
+            alt={doc.filename}
+            className="w-full h-full object-cover"
+            onError={() => setThumbFailed(true)}
+          />
+        ) : (
+          <FileIcon size={28} className="text-slate-300" />
+        )}
+      </a>
+      <div className="p-3">
+        <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-ink-800 hover:text-brand-600">
+          <FileText size={14} className="shrink-0" /> <span className="truncate">{doc.filename}</span>
+        </a>
+        <div className="text-xs text-slate-400 mt-1">{doc.category} · {formatDate(doc.createdAt)}</div>
+        <button onClick={() => onDelete(doc._id)} className="text-xs text-red-500 mt-2">Delete</button>
       </div>
     </div>
   );

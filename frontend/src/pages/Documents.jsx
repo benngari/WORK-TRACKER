@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Upload, FileText, Trash2 } from 'lucide-react';
+import { Upload, FileText, Trash2, File as FileIcon } from 'lucide-react';
 import api from '../api/axios';
-import { formatDate } from '../utils/format.js';
+import { formatDate, getThumbnailUrl } from '../utils/format.js';
 
 export default function Documents() {
   const [docs, setDocs] = useState([]);
@@ -25,7 +25,6 @@ export default function Documents() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('category', category);
-      // No 'job' field -> stored as a standalone historical document
       await api.post('/documents/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
       load();
     } catch (err) {
@@ -75,19 +74,42 @@ export default function Documents() {
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {filtered.map((d) => (
-            <div key={d._id} className="card">
-              <a href={d.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-ink-800 hover:text-brand-600">
-                <FileText size={16} /> <span className="truncate">{d.filename}</span>
-              </a>
-              <div className="text-xs text-slate-400 mt-1">{d.category} · {formatDate(d.createdAt)}</div>
-              {d.job && <div className="text-xs text-slate-400">Linked job: {d.job.jobCardRef || d.job._id}</div>}
-              <button onClick={() => handleDelete(d._id)} className="text-xs text-red-500 mt-2 flex items-center gap-1">
-                <Trash2 size={12} /> Delete
-              </button>
-            </div>
+            <DocumentCard key={d._id} doc={d} onDelete={handleDelete} />
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+function DocumentCard({ doc, onDelete }) {
+  const [thumbFailed, setThumbFailed] = useState(false);
+  const thumbUrl = getThumbnailUrl(doc.url);
+
+  return (
+    <div className="card p-0 overflow-hidden">
+      <a href={doc.url} target="_blank" rel="noreferrer" className="block bg-slate-50 h-32 flex items-center justify-center overflow-hidden">
+        {thumbUrl && !thumbFailed ? (
+          <img
+            src={thumbUrl}
+            alt={doc.filename}
+            className="w-full h-full object-cover"
+            onError={() => setThumbFailed(true)}
+          />
+        ) : (
+          <FileIcon size={32} className="text-slate-300" />
+        )}
+      </a>
+      <div className="p-3">
+        <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-ink-800 hover:text-brand-600">
+          <FileText size={14} className="shrink-0" /> <span className="truncate">{doc.filename}</span>
+        </a>
+        <div className="text-xs text-slate-400 mt-1">{doc.category} · {formatDate(doc.createdAt)}</div>
+        {doc.job && <div className="text-xs text-slate-400">Linked job: {doc.job.jobCardRef || doc.job._id}</div>}
+        <button onClick={() => onDelete(doc._id)} className="text-xs text-red-500 mt-2 flex items-center gap-1">
+          <Trash2 size={12} /> Delete
+        </button>
+      </div>
     </div>
   );
 }
