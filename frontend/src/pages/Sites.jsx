@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Trash2, MapPin } from 'lucide-react';
+import { Plus, Trash2, MapPin, Pencil } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import { siteLabel } from '../utils/format.js';
@@ -16,6 +16,7 @@ export default function Sites() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -33,14 +34,45 @@ export default function Sites() {
 
   useEffect(load, []);
 
+  const openAdd = () => {
+    setEditingId(null);
+    setForm(emptyForm);
+    setError('');
+    setModalOpen(true);
+  };
+
+  const openEdit = (site) => {
+    setEditingId(site._id);
+    setForm({
+      client: site.client?._id || '',
+      siteType: site.siteType,
+      bankName: site.bankName || '',
+      branch: site.branch || '',
+      branchCode: site.branchCode || '',
+      siteName: site.siteName || '',
+      location: site.location || '',
+      town: site.town || '',
+      county: site.county || '',
+      isNairobi: site.isNairobi || false,
+      notes: site.notes || '',
+    });
+    setError('');
+    setModalOpen(true);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
     try {
-      await api.post('/sites', form);
+      if (editingId) {
+        await api.put(`/sites/${editingId}`, form);
+      } else {
+        await api.post('/sites', form);
+      }
       setModalOpen(false);
       setForm(emptyForm);
+      setEditingId(null);
       load();
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save site');
@@ -70,7 +102,7 @@ export default function Sites() {
             <option key={c._id} value={c._id}>{c.name}</option>
           ))}
         </select>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => setModalOpen(true)}>
+        <button className="btn-primary flex items-center gap-1.5" onClick={openAdd}>
           <Plus size={16} /> New Site
         </button>
       </div>
@@ -103,7 +135,10 @@ export default function Sites() {
                   <td className="py-2.5 pr-4 text-slate-600">{s.siteType}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.town || '-'}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.county || '-'}</td>
-                  <td className="py-2.5 pr-4 text-right">
+                  <td className="py-2.5 pr-4 text-right whitespace-nowrap">
+                    <button onClick={() => openEdit(s)} className="text-slate-400 hover:text-brand-600 mr-3">
+                      <Pencil size={15} />
+                    </button>
                     <button onClick={() => handleDelete(s._id)} className="text-slate-300 hover:text-red-500">
                       <Trash2 size={16} />
                     </button>
@@ -115,7 +150,7 @@ export default function Sites() {
         </div>
       )}
 
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="New Site / Location" wide>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit Site / Location' : 'New Site / Location'} wide>
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
           <div className="grid grid-cols-2 gap-3">
@@ -177,7 +212,9 @@ export default function Sites() {
             Within Nairobi
           </label>
 
-          <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Save Site'}</button>
+          <button disabled={saving} className="btn-primary w-full">
+            {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Save Site'}
+          </button>
         </form>
       </Modal>
     </div>
