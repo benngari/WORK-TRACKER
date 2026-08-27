@@ -55,11 +55,12 @@ export default function JobDetail() {
           </div>
           <StatusBadge status={job.paymentStatus} />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-4">
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4">
           <Metric label="Callouts" value={job.attendanceCount} />
           <Metric label="Expected" value={formatKES(job.expected)} />
           <Metric label="Paid" value={formatKES(job.paid)} accent="text-brand-600" />
           <Metric label="Outstanding" value={formatKES(job.outstanding)} accent="text-amber-600" />
+          <Metric label="Fare Received" value={formatKES(job.fareReceived)} accent="text-blue-600" />
         </div>
         <div className="mt-5 flex flex-wrap items-center gap-2 text-xs">
           {['Job Created', 'Attended', 'Payment Due', 'Matched', 'Paid'].map((step, i) => (
@@ -317,11 +318,13 @@ function PaymentsTab({ job, onChange }) {
   const [loadingPayments, setLoadingPayments] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState('');
   const [allocateAmount, setAllocateAmount] = useState(0);
+  const [allocateType, setAllocateType] = useState('Payment');
   const [allocating, setAllocating] = useState(false);
   const [allocateError, setAllocateError] = useState('');
 
   const [editingId, setEditingId] = useState(null);
   const [editAmount, setEditAmount] = useState(0);
+  const [editType, setEditType] = useState('Payment');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
 
@@ -346,9 +349,14 @@ function PaymentsTab({ job, onChange }) {
     setAllocating(true);
     setAllocateError('');
     try {
-      await api.post(`/payments/${selectedPayment}/allocate`, { jobId: job._id, amount: allocateAmount });
+      await api.post(`/payments/${selectedPayment}/allocate`, {
+        jobId: job._id,
+        amount: allocateAmount,
+        allocationType: allocateType,
+      });
       setSelectedPayment('');
       setAllocateAmount(0);
+      setAllocateType('Payment');
       loadAvailablePayments();
       onChange();
     } catch (err) {
@@ -361,6 +369,7 @@ function PaymentsTab({ job, onChange }) {
   const startEdit = (allocation) => {
     setEditingId(allocation._id);
     setEditAmount(allocation.amount);
+    setEditType(allocation.allocationType || 'Payment');
     setEditError('');
   };
 
@@ -368,7 +377,7 @@ function PaymentsTab({ job, onChange }) {
     setEditSaving(true);
     setEditError('');
     try {
-      await api.put(`/payments/allocations/${allocationId}`, { amount: editAmount });
+      await api.put(`/payments/allocations/${allocationId}`, { amount: editAmount, allocationType: editType });
       setEditingId(null);
       loadAvailablePayments();
       onChange();
@@ -403,37 +412,60 @@ function PaymentsTab({ job, onChange }) {
             No unallocated M-PESA payments available. Add one from the M-PESA Payments page first.
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
-            <div className="sm:col-span-2">
-              <label className="label">Payment</label>
-              <select className="input" value={selectedPayment} onChange={(e) => setSelectedPayment(e.target.value)}>
-                <option value="">Select a payment...</option>
-                {availablePayments.map((p) => (
-                  <option key={p._id} value={p._id}>
-                    {p.mpesaTransaction?.transactionCode || p.method} — {formatKES(p.unallocated)} unallocated ({formatDate(p.receivedDate)})
-                  </option>
-                ))}
-              </select>
+          <div className="space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+              <div className="sm:col-span-2">
+                <label className="label">Payment</label>
+                <select className="input" value={selectedPayment} onChange={(e) => setSelectedPayment(e.target.value)}>
+                  <option value="">Select a payment...</option>
+                  {availablePayments.map((p) => (
+                    <option key={p._id} value={p._id}>
+                      {p.mpesaTransaction?.transactionCode || p.method} — {formatKES(p.unallocated)} unallocated ({formatDate(p.receivedDate)})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label">Amount to Allocate</label>
+                <input
+                  type="number"
+                  className="input"
+                  value={allocateAmount}
+                  onChange={(e) => setAllocateAmount(Number(e.target.value))}
+                  disabled={!selectedPayment}
+                />
+              </div>
             </div>
             <div>
-              <label className="label">Amount to Allocate</label>
-              <input
-                type="number"
-                className="input"
-                value={allocateAmount}
-                onChange={(e) => setAllocateAmount(Number(e.target.value))}
-                disabled={!selectedPayment}
-              />
+              <label className="label">This money is for</label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setAllocateType('Payment')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
+                    allocateType === 'Payment' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+                  }`}
+                >
+                  Job Payment
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAllocateType('Fare')}
+                  className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
+                    allocateType === 'Fare' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+                  }`}
+                >
+                  Fare / Transport
+                </button>
+              </div>
             </div>
-            <div className="sm:col-span-3">
-              <button
-                onClick={handleAllocate}
-                disabled={!selectedPayment || allocating}
-                className="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5"
-              >
-                <Link2 size={15} /> {allocating ? 'Allocating...' : 'Allocate to This Job'}
-              </button>
-            </div>
+            <button
+              onClick={handleAllocate}
+              disabled={!selectedPayment || allocating}
+              className="btn-primary w-full sm:w-auto flex items-center justify-center gap-1.5"
+            >
+              <Link2 size={15} /> {allocating ? 'Allocating...' : 'Allocate to This Job'}
+            </button>
           </div>
         )}
       </div>
@@ -447,39 +479,72 @@ function PaymentsTab({ job, onChange }) {
             <div className="text-sm text-slate-400 py-4">No payments allocated to this job yet.</div>
           )}
           {(job.allocations || []).map((a) => (
-            <div key={a._id} className="flex justify-between items-center py-2.5 text-sm">
-              <div>
-                {editingId === a._id ? (
-                  <input
-                    type="number"
-                    className="input w-32"
-                    value={editAmount}
-                    onChange={(e) => setEditAmount(Number(e.target.value))}
-                  />
-                ) : (
-                  <div className="font-medium text-ink-900">{formatKES(a.amount)}</div>
-                )}
-                <div className="text-xs text-slate-400">
-                  {a.payment?.method} · {formatDate(a.payment?.receivedDate)}
-                  {a.payment?.mpesaTransaction?.transactionCode ? ` · ${a.payment.mpesaTransaction.transactionCode}` : ''}
+            <div key={a._id} className="py-2.5">
+              <div className="flex justify-between items-start">
+                <div>
+                  <div className="flex items-center gap-2">
+                    {editingId === a._id ? (
+                      <input
+                        type="number"
+                        className="input w-32"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(Number(e.target.value))}
+                      />
+                    ) : (
+                      <span className="font-medium text-ink-900">{formatKES(a.amount)}</span>
+                    )}
+                    <span
+                      className={`badge ${
+                        (a.allocationType || 'Payment') === 'Fare' ? 'bg-blue-50 text-blue-700' : 'bg-brand-50 text-brand-700'
+                      }`}
+                    >
+                      {(a.allocationType || 'Payment') === 'Fare' ? 'Fare' : 'Job Payment'}
+                    </span>
+                  </div>
+                  <div className="text-xs text-slate-400 mt-1">
+                    {a.payment?.method} · {formatDate(a.payment?.receivedDate)}
+                    {a.payment?.mpesaTransaction?.transactionCode ? ` · ${a.payment.mpesaTransaction.transactionCode}` : ''}
+                  </div>
+                  {editingId === a._id && (
+                    <div className="flex gap-2 mt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEditType('Payment')}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium border ${
+                          editType === 'Payment' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        Job Payment
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditType('Fare')}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium border ${
+                          editType === 'Fare' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+                        }`}
+                      >
+                        Fare / Transport
+                      </button>
+                    </div>
+                  )}
                 </div>
-              </div>
-              <div className="flex items-center gap-3">
-                {editingId === a._id ? (
-                  <>
-                    <button onClick={() => saveEdit(a._id)} disabled={editSaving} className="text-brand-600 text-xs font-medium">
-                      {editSaving ? 'Saving...' : 'Save'}
-                    </button>
-                    <button onClick={() => setEditingId(null)} className="text-slate-400 text-xs font-medium">
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button onClick={() => startEdit(a)} className="text-brand-600 text-xs font-medium">Edit</button>
-                    <button onClick={() => removeAllocation(a._id)} className="text-red-500 text-xs font-medium">Remove</button>
-                  </>
-                )}
+                <div className="flex items-center gap-3 text-sm shrink-0 ml-3">
+                  {editingId === a._id ? (
+                    <>
+                      <button onClick={() => saveEdit(a._id)} disabled={editSaving} className="text-brand-600 text-xs font-medium">
+                        {editSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      <button onClick={() => setEditingId(null)} className="text-slate-400 text-xs font-medium">
+                        Cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button onClick={() => startEdit(a)} className="text-brand-600 text-xs font-medium">Edit</button>
+                      <button onClick={() => removeAllocation(a._id)} className="text-red-500 text-xs font-medium">Remove</button>
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           ))}

@@ -4,9 +4,6 @@ const PaymentAllocation = require('../models/PaymentAllocation');
 const JobDocument = require('../models/JobDocument');
 const { cloudinary } = require('../config/cloudinary');
 
-// Batch-computes financials for many jobs in ONE pair of queries total,
-// instead of 2 queries per job. This is what keeps Jobs, Payment Ledger,
-// and Outstanding Payments fast even with many jobs.
 async function batchComputeFinancials(jobs, ownerId) {
   const jobIds = jobs.map((j) => j._id);
   const [allAttendance, allAllocations] = await Promise.all([
@@ -20,14 +17,20 @@ async function batchComputeFinancials(jobs, ownerId) {
     (attendanceByJob[key] = attendanceByJob[key] || []).push(a);
   }
   const paidByJob = {};
+  const fareByJob = {};
   for (const a of allAllocations) {
     const key = String(a.job);
-    paidByJob[key] = (paidByJob[key] || 0) + a.amount;
+    if (a.allocationType === 'Fare') {
+      fareByJob[key] = (fareByJob[key] || 0) + a.amount;
+    } else {
+      paidByJob[key] = (paidByJob[key] || 0) + a.amount;
+    }
   }
 
   return jobs.map((job) => {
     const jobAttendance = attendanceByJob[String(job._id)] || [];
     const paid = paidByJob[String(job._id)] || 0;
+    const fareReceived = fareByJob[String(job._id)] || 0;
     const expected = job.expectedPaymentOverride ?? jobAttendance.length * job.rate;
     const outstanding = Math.max(0, expected - paid);
 
@@ -37,16 +40,19 @@ async function batchComputeFinancials(jobs, ownerId) {
     else if (paid === expected && expected > 0) paymentStatus = 'Paid';
     else if (paid > expected) paymentStatus = 'Overpaid';
 
-    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, outstanding, paymentStatus };
+    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, fareReceived, outstanding, paymentStatus };
   });
 }
 
-// Single-job version, used by the job detail page and other controllers
-// that only need one job's numbers at a time.
 async function computeJobFinancials(job) {
   const attendance = await Attendance.find({ job: job._id });
   const allocations = await PaymentAllocation.find({ job: job._id });
-  const paid = allocations.reduce((sum, a) => sum + a.amount, 0);
+  const paid = allocations
+    .filter((a) => a.allocationType !== 'Fare')
+    .reduce((sum, a) => sum + a.amount, 0);
+  const fareReceived = allocations
+    .filter((a) => a.allocationType === 'Fare')
+    .reduce((sum, a) => sum + a.amount, 0);
   const expected = job.expectedPaymentOverride ?? attendance.length * job.rate;
   const outstanding = Math.max(0, expected - paid);
 
@@ -56,7 +62,7 @@ async function computeJobFinancials(job) {
   else if (paid === expected && expected > 0) paymentStatus = 'Paid';
   else if (paid > expected) paymentStatus = 'Overpaid';
 
-  return { attendanceCount: attendance.length, expected, paid, outstanding, paymentStatus, attendance };
+  return { attendanceCount: attendance.length, expected, paid, fareReceived, outstanding, paymentStatus, attendance };
 }
 
 exports.list = async (req, res) => {
@@ -136,8 +142,6 @@ exports.update = async (req, res) => {
   }
 };
 
-// Soft delete: moves the job (and its documents) to Trash instead of
-// permanently removing them, so they can be restored later.
 exports.remove = async (req, res) => {
   try {
     const job = await Job.findOne({ _id: req.params.id, owner: req.user.id, deletedAt: null });
@@ -168,8 +172,6 @@ exports.restore = async (req, res) => {
   }
 };
 
-// Permanent delete: only allowed from Trash. Removes the job, its
-// attendance, payment allocations, and documents (including from Cloudinary).
 exports.permanentRemove = async (req, res) => {
   try {
     const job = await Job.findOne({ _id: req.params.id, owner: req.user.id, deletedAt: { $ne: null } });

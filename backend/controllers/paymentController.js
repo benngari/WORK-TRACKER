@@ -37,7 +37,7 @@ exports.create = async (req, res) => {
 
 exports.allocate = async (req, res) => {
   try {
-    const { jobId, amount, notes } = req.body;
+    const { jobId, amount, notes, allocationType } = req.body;
     const payment = await Payment.findOne({ _id: req.params.id, owner: req.user.id });
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
 
@@ -56,6 +56,7 @@ exports.allocate = async (req, res) => {
       payment: payment._id,
       job: job._id,
       amount,
+      allocationType: allocationType === 'Fare' ? 'Fare' : 'Payment',
       notes,
     });
 
@@ -75,35 +76,39 @@ exports.allocate = async (req, res) => {
   }
 };
 
-// Change the amount on an existing allocation. Keeps the MpesaTransaction's
-// allocatedAmount and the job's paymentStatus in sync with the correction.
 exports.updateAllocation = async (req, res) => {
   try {
-    const { amount } = req.body;
+    const { amount, allocationType } = req.body;
     const allocation = await PaymentAllocation.findOne({ _id: req.params.allocationId, owner: req.user.id });
     if (!allocation) return res.status(404).json({ message: 'Allocation not found' });
 
     const payment = await Payment.findById(allocation.payment);
     if (!payment) return res.status(404).json({ message: 'Payment not found' });
 
-    const otherAllocations = await PaymentAllocation.find({
-      payment: payment._id,
-      _id: { $ne: allocation._id },
-    });
-    const otherTotal = otherAllocations.reduce((s, a) => s + a.amount, 0);
-    if (amount + otherTotal > payment.amount) {
-      return res.status(400).json({
-        message: `That would exceed the payment total. Only KES ${payment.amount - otherTotal} is available for this allocation.`,
+    if (amount !== undefined) {
+      const otherAllocations = await PaymentAllocation.find({
+        payment: payment._id,
+        _id: { $ne: allocation._id },
       });
+      const otherTotal = otherAllocations.reduce((s, a) => s + a.amount, 0);
+      if (amount + otherTotal > payment.amount) {
+        return res.status(400).json({
+          message: `That would exceed the payment total. Only KES ${payment.amount - otherTotal} is available for this allocation.`,
+        });
+      }
+
+      const diff = amount - allocation.amount;
+      allocation.amount = amount;
+      if (payment.mpesaTransaction) {
+        await MpesaTransaction.findByIdAndUpdate(payment.mpesaTransaction, { $inc: { allocatedAmount: diff } });
+      }
     }
 
-    const diff = amount - allocation.amount;
-    allocation.amount = amount;
+    if (allocationType === 'Payment' || allocationType === 'Fare') {
+      allocation.allocationType = allocationType;
+    }
+
     await allocation.save();
-
-    if (payment.mpesaTransaction) {
-      await MpesaTransaction.findByIdAndUpdate(payment.mpesaTransaction, { $inc: { allocatedAmount: diff } });
-    }
 
     const job = await Job.findOne({ _id: allocation.job, owner: req.user.id, deletedAt: null });
     if (job) {

@@ -8,6 +8,10 @@ const allocationSchema = new mongoose.Schema(
     payment: { type: mongoose.Schema.Types.ObjectId, ref: 'Payment', required: true, index: true },
     job: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', required: true, index: true },
     amount: { type: Number, required: true },
+    // Whether this money counts toward the job's callout payment, or is a
+    // separate fare/transport reimbursement (never mixed into the KES/callout
+    // payment calculation, per the "don't mix fare with earnings" rule).
+    allocationType: { type: String, enum: ['Payment', 'Fare'], default: 'Payment' },
     notes: { type: String, trim: true },
   },
   { timestamps: true }
