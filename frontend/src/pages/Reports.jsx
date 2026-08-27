@@ -7,7 +7,7 @@ export default function Reports() {
   const [selectedClient, setSelectedClient] = useState('');
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(false);
-
+  
   useEffect(() => {
     api.get('/clients').then((res) => setClients(res.data));
   }, []);
@@ -19,13 +19,15 @@ export default function Reports() {
     api.get(`/clients/${clientId}/summary`).then((res) => setSummary(res.data)).finally(() => setLoading(false));
   };
 
-  // Group sites by bank/site name for the "every branch I've attended" view
   const grouped = {};
   if (summary) {
     summary.sites.forEach((s) => {
-      const key = s.siteType === 'Bank' ? s.bankName : s.siteType;
-      grouped[key] = grouped[key] || [];
-      grouped[key].push(s);
+      const rawLabel = s.siteType === 'Bank' ? s.bankName : s.siteType;
+      const normalizedKey = (rawLabel || '').trim().toLowerCase().replace(/\s+/g, ' ');
+      if (!grouped[normalizedKey]) {
+        grouped[normalizedKey] = { label: titleCase(rawLabel), sites: [] };
+      }
+      grouped[normalizedKey].sites.push(s);
     });
   }
 
@@ -58,11 +60,11 @@ export default function Reports() {
             </div>
           </div>
 
-          {Object.entries(grouped).map(([groupName, sites]) => (
-            <div key={groupName} className="card">
-              <div className="font-semibold text-ink-900 mb-3">{groupName}</div>
+          {Object.values(grouped).map((group) => (
+            <div key={group.label} className="card">
+              <div className="font-semibold text-ink-900 mb-3">{group.label}</div>
               <div className="space-y-1.5">
-                {sites.map((s) => (
+                {group.sites.map((s) => (
                   <div key={s._id} className="flex items-center justify-between text-sm py-1.5 border-b border-slate-50 last:border-0">
                     <span className="text-slate-600">→ {siteLabel(s)}</span>
                     <span className="text-xs text-slate-400">{s.town}{s.county ? `, ${s.county}` : ''}</span>
@@ -75,4 +77,15 @@ export default function Reports() {
       )}
     </div>
   );
+}
+
+function titleCase(str) {
+  if (!str) return 'Unknown';
+  return str
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .split(' ')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
 }
