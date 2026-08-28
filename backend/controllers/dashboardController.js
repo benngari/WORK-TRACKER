@@ -6,14 +6,30 @@ const MpesaTransaction = require('../models/MpesaTransaction');
 const Transport = require('../models/Transport');
 const Site = require('../models/Site');
 
+function getPeriodRange(period) {
+  const now = new Date();
+  if (period === 'month') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    return { from, to };
+  }
+  if (period === 'year') {
+    const from = new Date(now.getFullYear(), 0, 1);
+    const to = new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999);
+    return { from, to };
+  }
+  return null;
+}
+
 exports.summary = async (req, res) => {
   try {
     const ownerFilter = { owner: req.user.id };
-    const jobs = await Job.find(ownerFilter).populate('client').populate('site');
+    const period = ['month', 'year'].includes(req.query.period) ? req.query.period : 'all';
+    const range = getPeriodRange(period);
+
+    const jobs = await Job.find({ ...ownerFilter, deletedAt: null }).populate('client').populate('site');
     const jobIds = jobs.map((j) => j._id);
 
-    // Fetch everything needed in a handful of batched queries instead of
-    // querying per job (which is what made this slow with many jobs).
     const [allAttendance, allAllocations, payments, mpesaCount, transportAgg, nairobiAgg] = await Promise.all([
       Attendance.find({ job: { $in: jobIds }, owner: req.user.id }),
       PaymentAllocation.find({ job: { $in: jobIds }, owner: req.user.id }),
@@ -36,6 +52,7 @@ exports.summary = async (req, res) => {
     }
     const paidByJob = {};
     for (const a of allAllocations) {
+      if (a.allocationType === 'Fare') continue;
       const key = String(a.job);
       paidByJob[key] = (paidByJob[key] || 0) + a.amount;
     }
@@ -67,14 +84,14 @@ exports.summary = async (req, res) => {
       byClient[clientName].expected += expected;
       byClient[clientName].paid += paid;
 
-      const siteLabel = job.site
+      const siteLbl = job.site
         ? job.site.siteType === 'Bank'
           ? [job.site.bankName, job.site.branch].filter(Boolean).join(' - ')
           : job.site.siteName
         : 'Unknown Site';
-      bySite[siteLabel] = bySite[siteLabel] || { expected: 0, paid: 0 };
-      bySite[siteLabel].expected += expected;
-      bySite[siteLabel].paid += paid;
+      bySite[siteLbl] = bySite[siteLbl] || { expected: 0, paid: 0 };
+      bySite[siteLbl].expected += expected;
+      bySite[siteLbl].paid += paid;
 
       if (job.site?.siteType === 'Bank' && job.site.bankName) {
         byBank[job.site.bankName] = byBank[job.site.bankName] || { expected: 0, paid: 0 };
@@ -96,18 +113,38 @@ exports.summary = async (req, res) => {
       byMonth[key].paid += p.amount;
     }
 
+    let periodExpected = totalExpected;
+    let periodPaid = totalPaid;
+    let periodCallouts = totalCallouts;
+    let periodOutstanding = Math.max(0, totalExpected - totalPaid);
+
+    if (range) {
+      const periodAttendance = allAttendance.filter((a) => a.date >= range.from && a.date <= range.to);
+      periodExpected = periodAttendance.reduce((sum, a) => sum + a.rate, 0);
+      periodCallouts = periodAttendance.length;
+
+      const periodPayments = payments.filter((p) => p.receivedDate >= range.from && p.receivedDate <= range.to);
+      const periodPaymentIds = new Set(periodPayments.map((p) => String(p._id)));
+      periodPaid = allAllocations
+        .filter((a) => a.allocationType !== 'Fare' && periodPaymentIds.has(String(a.payment)))
+        .reduce((sum, a) => sum + a.amount, 0);
+
+      periodOutstanding = Math.max(0, periodExpected - periodPaid);
+    }
+
     const sitesVisited = await Site.countDocuments({
       _id: { $in: jobs.map((j) => j.site?._id).filter(Boolean) },
     });
 
     res.json({
+      period,
       cards: {
-        totalExpected,
-        totalPaid,
-        totalOutstanding: Math.max(0, totalExpected - totalPaid),
+        totalExpected: periodExpected,
+        totalPaid: periodPaid,
+        totalOutstanding: periodOutstanding,
+        totalCallouts: periodCallouts,
         workCompletedNotPaid,
         totalJobs: totalCallouts,
-        totalCallouts,
         sitesVisited,
         mpesaPayments: mpesaCount,
         totalFare: transportAgg[0]?.totalFare || 0,
