@@ -1,19 +1,22 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate, siteLabel, getThumbnailUrl } from '../utils/format.js';
+import { useToast } from '../context/ToastContext.jsx';
 
 const tabs = ['Overview', 'Attendance', 'Payments', 'Documents', 'Notes'];
 
 export default function JobDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const toast = useToast();
   const [job, setJob] = useState(null);
   const [tab, setTab] = useState('Overview');
   const [loading, setLoading] = useState(true);
+  const [editJobOpen, setEditJobOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -21,6 +24,17 @@ export default function JobDetail() {
   };
 
   useEffect(load, [id]);
+
+  const handleTrash = async () => {
+    if (!confirm('Move this job to Trash? Its documents will move with it. You can restore both later from the Trash page.')) return;
+    try {
+      await api.delete(`/jobs/${job._id}`);
+      toast.success('Job moved to Trash');
+      navigate('/jobs');
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete job');
+    }
+  };
 
   if (loading) return <div className="text-sm text-slate-400">Loading...</div>;
   if (!job) return <div className="text-sm text-red-500">Job not found.</div>;
@@ -31,20 +45,14 @@ export default function JobDetail() {
         <button onClick={() => navigate('/jobs')} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-ink-900">
           <ArrowLeft size={16} /> Back to Jobs
         </button>
-        <button
-          onClick={async () => {
-            if (!confirm('Move this job to Trash? Its documents will move with it. You can restore both later from the Trash page.')) return;
-            try {
-              await api.delete(`/jobs/${job._id}`);
-              navigate('/jobs');
-            } catch (err) {
-              alert(err.response?.data?.message || 'Failed to delete job');
-            }
-          }}
-          className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700"
-        >
-          <Trash2 size={15} /> Move to Trash
-        </button>
+        <div className="flex items-center gap-4">
+          <button onClick={() => setEditJobOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
+            <Pencil size={15} /> Edit Job
+          </button>
+          <button onClick={handleTrash} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700">
+            <Trash2 size={15} /> Move to Trash
+          </button>
+        </div>
       </div>
 
       <div className="card">
@@ -98,6 +106,8 @@ export default function JobDetail() {
       {tab === 'Payments' && <PaymentsTab job={job} onChange={load} />}
       {tab === 'Documents' && <DocumentsTab job={job} onChange={load} />}
       {tab === 'Notes' && <NotesTab job={job} onChange={load} />}
+
+      <EditJobModal open={editJobOpen} onClose={() => setEditJobOpen(false)} job={job} onSaved={load} />
     </div>
   );
 }
@@ -108,6 +118,117 @@ function Metric({ label, value, accent = 'text-ink-900' }) {
       <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">{label}</div>
       <div className={`text-lg font-bold ${accent}`}>{value}</div>
     </div>
+  );
+}
+
+function EditJobModal({ open, onClose, job, onSaved }) {
+  const toast = useToast();
+  const [clients, setClients] = useState([]);
+  const [sites, setSites] = useState([]);
+  const [form, setForm] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (!open || !job) return;
+    setForm({
+      client: job.client?._id || '',
+      site: job.site?._id || '',
+      jobCardRef: job.jobCardRef || '',
+      jobType: job.jobType || '',
+      description: job.description || '',
+      status: job.status || 'Open',
+      rate: job.rate,
+      paymentDueDate: job.paymentDueDate ? job.paymentDueDate.slice(0, 10) : '',
+    });
+    setError('');
+    Promise.all([api.get('/clients'), api.get('/sites')]).then(([c, s]) => {
+      setClients(c.data);
+      setSites(s.data);
+    });
+  }, [open, job]);
+
+  if (!form) return null;
+
+  const clientSites = sites.filter((s) => s.client?._id === form.client);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await api.put(`/jobs/${job._id}`, form);
+      toast.success('Job updated');
+      onClose();
+      onSaved();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to update job');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={onClose} title="Edit Job" wide>
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Client</label>
+            <select
+              required
+              className="input"
+              value={form.client}
+              onChange={(e) => setForm({ ...form, client: e.target.value, site: '' })}
+            >
+              <option value="">Select client...</option>
+              {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label">Site</label>
+            <select required className="input" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} disabled={!form.client}>
+              <option value="">Select site...</option>
+              {clientSites.map((s) => <option key={s._id} value={s._id}>{siteLabel(s)}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Job Card / Reference</label>
+            <input className="input" value={form.jobCardRef} onChange={(e) => setForm({ ...form, jobCardRef: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Job Type</label>
+            <input className="input" value={form.jobType} onChange={(e) => setForm({ ...form, jobType: e.target.value })} />
+          </div>
+        </div>
+        <div>
+          <label className="label">Description</label>
+          <textarea className="input" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} />
+        </div>
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="label">Status</label>
+            <select className="input" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>
+              <option>Open</option>
+              <option>In Progress</option>
+              <option>Completed</option>
+              <option>Cancelled</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Rate (KES/callout)</label>
+            <input type="number" className="input" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
+          </div>
+          <div>
+            <label className="label">Payment Due Date</label>
+            <input type="date" className="input" value={form.paymentDueDate} onChange={(e) => setForm({ ...form, paymentDueDate: e.target.value })} />
+          </div>
+        </div>
+        <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Save Changes'}</button>
+      </form>
+    </Modal>
   );
 }
 
@@ -133,6 +254,7 @@ function Row({ label, value }) {
 }
 
 function AttendanceTab({ job, onChange }) {
+  const toast = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyAttendanceForm(job.rate));
@@ -172,8 +294,10 @@ function AttendanceTab({ job, onChange }) {
     try {
       if (editingId) {
         await api.put(`/attendance/${editingId}`, payload);
+        toast.success('Attendance updated');
       } else {
         await api.post('/attendance', { ...payload, job: job._id });
+        toast.success('Attendance recorded');
       }
       setModalOpen(false);
       onChange();
@@ -186,8 +310,13 @@ function AttendanceTab({ job, onChange }) {
 
   const handleDelete = async (attId) => {
     if (!confirm('Delete this attendance record?')) return;
-    await api.delete(`/attendance/${attId}`);
-    onChange();
+    try {
+      await api.delete(`/attendance/${attId}`);
+      toast.success('Attendance deleted');
+      onChange();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete attendance');
+    }
   };
 
   return (
@@ -314,6 +443,7 @@ function emptyAttendanceForm(rate) {
 }
 
 function PaymentsTab({ job, onChange }) {
+  const toast = useToast();
   const [availablePayments, setAvailablePayments] = useState([]);
   const [loadingPayments, setLoadingPayments] = useState(true);
   const [selectedPayment, setSelectedPayment] = useState('');
@@ -354,6 +484,7 @@ function PaymentsTab({ job, onChange }) {
         amount: allocateAmount,
         allocationType: allocateType,
       });
+      toast.success('Payment allocated');
       setSelectedPayment('');
       setAllocateAmount(0);
       setAllocateType('Payment');
@@ -378,6 +509,7 @@ function PaymentsTab({ job, onChange }) {
     setEditError('');
     try {
       await api.put(`/payments/allocations/${allocationId}`, { amount: editAmount, allocationType: editType });
+      toast.success('Allocation updated');
       setEditingId(null);
       loadAvailablePayments();
       onChange();
@@ -392,10 +524,11 @@ function PaymentsTab({ job, onChange }) {
     if (!confirm('Remove this payment allocation from the job? The amount becomes unallocated again.')) return;
     try {
       await api.delete(`/payments/allocations/${allocationId}`);
+      toast.success('Allocation removed');
       loadAvailablePayments();
       onChange();
     } catch (err) {
-      alert(err.response?.data?.message || 'Failed to remove allocation');
+      toast.error(err.response?.data?.message || 'Failed to remove allocation');
     }
   };
 
@@ -553,6 +686,7 @@ function PaymentsTab({ job, onChange }) {
 }
 
 function DocumentsTab({ job, onChange }) {
+  const toast = useToast();
   const [uploading, setUploading] = useState(false);
   const [category, setCategory] = useState('Job Card');
 
@@ -566,9 +700,10 @@ function DocumentsTab({ job, onChange }) {
       formData.append('job', job._id);
       formData.append('category', category);
       await api.post('/documents/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+      toast.success('Document uploaded');
       onChange();
     } catch (err) {
-      alert(err.response?.data?.message || 'Upload failed');
+      toast.error(err.response?.data?.message || 'Upload failed');
     } finally {
       setUploading(false);
       e.target.value = '';
@@ -577,8 +712,13 @@ function DocumentsTab({ job, onChange }) {
 
   const handleDelete = async (docId) => {
     if (!confirm('Delete this document?')) return;
-    await api.delete(`/documents/${docId}`);
-    onChange();
+    try {
+      await api.delete(`/documents/${docId}`);
+      toast.success('Document deleted');
+      onChange();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete document');
+    }
   };
 
   return (
@@ -637,6 +777,7 @@ function JobDocumentCard({ doc, onDelete }) {
 }
 
 function NotesTab({ job, onChange }) {
+  const toast = useToast();
   const [notes, setNotes] = useState(job.notes || '');
   const [saving, setSaving] = useState(false);
 
@@ -644,7 +785,10 @@ function NotesTab({ job, onChange }) {
     setSaving(true);
     try {
       await api.put(`/jobs/${job._id}`, { notes });
+      toast.success('Notes saved');
       onChange();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save notes');
     } finally {
       setSaving(false);
     }
