@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -16,7 +16,7 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [tab, setTab] = useState('Overview');
   const [loading, setLoading] = useState(true);
-  const [editJobOpen, setEditJobOpen] = useState(false);
+  const [repeatOpen, setRepeatOpen] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -48,6 +48,9 @@ export default function JobDetail() {
         <div className="flex items-center gap-4">
           <button onClick={() => setEditJobOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
             <Pencil size={15} /> Edit Job
+          </button>
+                    <button onClick={() => setRepeatOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
+            <Copy size={15} /> Duplicate
           </button>
           <button onClick={handleTrash} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700">
             <Trash2 size={15} /> Move to Trash
@@ -107,8 +110,69 @@ export default function JobDetail() {
       {tab === 'Documents' && <DocumentsTab job={job} onChange={load} />}
       {tab === 'Notes' && <NotesTab job={job} onChange={load} />}
 
-      <EditJobModal open={editJobOpen} onClose={() => setEditJobOpen(false)} job={job} onSaved={load} />
+            <EditJobModal open={editJobOpen} onClose={() => setEditJobOpen(false)} job={job} onSaved={load} />
+      {repeatOpen && (
+        <RepeatJobModal
+          job={job}
+          onClose={() => setRepeatOpen(false)}
+          onDone={(newJobId) => navigate(`/jobs/${newJobId}`)}
+        />
+      )}
     </div>
+  );
+}
+
+function RepeatJobModal({ job, onClose, onDone }) {
+  const toast = useToast();
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [fare, setFare] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const { data: newJob } = await api.post('/jobs', {
+        client: job.client?._id,
+        site: job.site?._id,
+        jobCardRef: job.jobCardRef,
+        jobType: job.jobType,
+        description: job.description,
+        status: 'Open',
+        rate: job.rate,
+        paymentDueDate: '',
+      });
+      await api.post('/attendance', { job: newJob._id, date, rate: job.rate, fare });
+      toast.success('Job repeated');
+      onClose();
+      onDone(newJob._id);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to repeat job');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={true} onClose={onClose} title="Duplicate This Job">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
+        <div className="text-sm text-slate-500">
+          Creates a new job for <span className="font-medium text-ink-800">{job.client?.name} — {siteLabel(job.site)}</span> with the same rate ({formatKES(job.rate)}) and job details.
+        </div>
+        <div>
+          <label className="label">Date of Visit</label>
+          <input required type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Fare (KES)</label>
+          <input type="number" className="input" value={fare} onChange={(e) => setFare(Number(e.target.value))} />
+        </div>
+        <button disabled={saving} className="btn-primary w-full">{saving ? 'Creating...' : 'Create Duplicate Job'}</button>
+      </form>
+    </Modal>
   );
 }
 

@@ -1,10 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Plus, Briefcase } from 'lucide-react';
+import { Plus, Briefcase, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate, siteLabel } from '../utils/format.js';
+import { useToast } from '../context/ToastContext.jsx';
 
 const emptyForm = {
   client: '', site: '', jobCardRef: '', jobType: '', description: '',
@@ -14,6 +15,7 @@ const emptyForm = {
 
 export default function Jobs() {
   const navigate = useNavigate();
+  const toast = useToast();
   const [jobs, setJobs] = useState([]);
   const [clients, setClients] = useState([]);
   const [sites, setSites] = useState([]);
@@ -23,6 +25,7 @@ export default function Jobs() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [filters, setFilters] = useState({ client: '', status: '' });
+  const [repeatJob, setRepeatJob] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -59,6 +62,7 @@ export default function Jobs() {
         fare: form.fare,
       });
 
+      toast.success('Job created');
       setModalOpen(false);
       setForm(emptyForm);
       load();
@@ -101,7 +105,7 @@ export default function Jobs() {
         <div className="card overflow-x-auto p-0">
           <table className="w-full text-sm">
             <thead>
-                            <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
+              <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
                 <th className="py-3 px-4">Date</th>
                 <th className="py-3 px-4">Client</th>
                 <th className="py-3 px-4">Site</th>
@@ -111,6 +115,7 @@ export default function Jobs() {
                 <th className="py-3 px-4">Paid</th>
                 <th className="py-3 px-4">Balance</th>
                 <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4"></th>
               </tr>
             </thead>
             <tbody>
@@ -120,7 +125,7 @@ export default function Jobs() {
                   className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
                   onClick={() => navigate(`/jobs/${j._id}`)}
                 >
-                                    <td className="py-2.5 px-4 text-slate-600">{formatDate(j.date)}</td>
+                  <td className="py-2.5 px-4 text-slate-600">{formatDate(j.date)}</td>
                   <td className="py-2.5 px-4 font-medium text-ink-900">{j.client?.name}</td>
                   <td className="py-2.5 px-4 text-slate-600">{siteLabel(j.site)}</td>
                   <td className="py-2.5 px-4 text-slate-600">{j.jobCardRef || '-'}</td>
@@ -129,6 +134,18 @@ export default function Jobs() {
                   <td className="py-2.5 px-4 text-slate-600">{formatKES(j.paid)}</td>
                   <td className="py-2.5 px-4 font-medium text-amber-600">{formatKES(j.outstanding)}</td>
                   <td className="py-2.5 px-4"><StatusBadge status={j.paymentStatus} /></td>
+                  <td className="py-2.5 px-4 text-right">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setRepeatJob(j);
+                      }}
+                      className="text-slate-400 hover:text-brand-600"
+                      title="Repeat this job (same client/site/rate, new date)"
+                    >
+                      <Copy size={15} />
+                    </button>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -210,6 +227,64 @@ export default function Jobs() {
           <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Create Job'}</button>
         </form>
       </Modal>
+
+      {repeatJob && (
+        <RepeatJobModal job={repeatJob} onClose={() => setRepeatJob(null)} onDone={load} />
+      )}
     </div>
+  );
+}
+
+function RepeatJobModal({ job, onClose, onDone }) {
+  const toast = useToast();
+  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [fare, setFare] = useState(0);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      const { data: newJob } = await api.post('/jobs', {
+        client: job.client?._id,
+        site: job.site?._id,
+        jobCardRef: job.jobCardRef,
+        jobType: job.jobType,
+        description: job.description,
+        status: 'Open',
+        rate: job.rate,
+        paymentDueDate: '',
+      });
+      await api.post('/attendance', { job: newJob._id, date, rate: job.rate, fare });
+      toast.success('Job repeated');
+      onClose();
+      onDone();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to repeat job');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={true} onClose={onClose} title="Repeat This Job">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
+        <div className="text-sm text-slate-500">
+          Creates a new job for <span className="font-medium text-ink-800">{job.client?.name} — {siteLabel(job.site)}</span> with the same rate ({formatKES(job.rate)}) and job details.
+        </div>
+        <div>
+          <label className="label">Date of Visit</label>
+          <input required type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Fare (KES)</label>
+          <input type="number" className="input" value={fare} onChange={(e) => setFare(Number(e.target.value))} />
+        </div>
+        <button disabled={saving} className="btn-primary w-full">{saving ? 'Creating...' : 'Create Repeat Job'}</button>
+      </form>
+    </Modal>
   );
 }
