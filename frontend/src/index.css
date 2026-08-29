@@ -67,3 +67,25 @@ body {
 .badge {
   @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
 }
+
+/* Print / "Save as PDF" support: hide navigation and interactive chrome,
+   let the printable content (e.g. Payment Ledger table) take the full page. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  body, #root {
+    height: auto;
+  }
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .card {
+    box-shadow: none !important;
+    border: 1px solid #e2e8f0 !important;
+  }
+  table {
+    font-size: 11px;
+  }
+}

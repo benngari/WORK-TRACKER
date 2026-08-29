@@ -1,8 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Download, Printer } from 'lucide-react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
+import { downloadCSV } from '../utils/exportCsv.js';
 
 export default function PaymentLedger() {
   const navigate = useNavigate();
@@ -27,9 +29,26 @@ export default function PaymentLedger() {
     { expected: 0, paid: 0, balance: 0 }
   );
 
+  const handleExportCSV = () => {
+    const headers = ['Job Date', 'Client', 'Site', 'Job Card', 'Callouts', 'Expected', 'Paid', 'Balance', 'Payment Due Date', 'Status'];
+    const csvRows = rows.map((r) => [
+      formatDate(r.jobDate),
+      r.client || '',
+      r.site || '',
+      r.jobCardRef || '',
+      r.callouts,
+      r.expected,
+      r.paid,
+      r.balance,
+      formatDate(r.paymentDueDate),
+      r.status,
+    ]);
+    downloadCSV(`payment-ledger-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="card flex flex-wrap gap-3">
+      <div className="card flex flex-wrap gap-3 no-print">
         <select className="input max-w-xs" value={filters.client} onChange={(e) => setFilters({ ...filters, client: e.target.value })}>
           <option value="">All Clients</option>
           {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
@@ -43,6 +62,14 @@ export default function PaymentLedger() {
         </select>
         <input type="date" className="input max-w-xs" value={filters.from} onChange={(e) => setFilters({ ...filters, from: e.target.value })} />
         <input type="date" className="input max-w-xs" value={filters.to} onChange={(e) => setFilters({ ...filters, to: e.target.value })} />
+        <div className="flex gap-2 ml-auto">
+          <button onClick={handleExportCSV} className="btn-secondary flex items-center gap-1.5">
+            <Download size={15} /> Export CSV
+          </button>
+          <button onClick={() => window.print()} className="btn-secondary flex items-center gap-1.5">
+            <Printer size={15} /> Print / PDF
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-3 gap-4">

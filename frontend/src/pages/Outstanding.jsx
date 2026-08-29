@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Download } from 'lucide-react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
+import { downloadCSV } from '../utils/exportCsv.js';
 
 export default function Outstanding() {
   const navigate = useNavigate();
@@ -16,14 +17,36 @@ export default function Outstanding() {
 
   const total = rows.reduce((s, r) => s + r.outstanding, 0);
 
+  const handleExportCSV = () => {
+    const headers = ['Client', 'Site', 'Job Card', 'Expected', 'Paid', 'Outstanding', 'Last Attendance', 'Payment Due Date', 'Days Outstanding', 'Status'];
+    const csvRows = rows.map((r) => [
+      r.client || '',
+      r.site || '',
+      r.jobCardRef || '',
+      r.expected,
+      r.paid,
+      r.outstanding,
+      formatDate(r.lastAttendance),
+      formatDate(r.paymentDueDate),
+      r.daysOutstanding ?? '',
+      r.status,
+    ]);
+    downloadCSV(`outstanding-payments-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
+  };
+
   return (
     <div className="space-y-4">
-      <div className="card bg-amber-50 border-amber-100 flex items-center gap-3">
-        <AlertCircle className="text-amber-500" />
-        <div>
-          <div className="text-xs text-amber-700 uppercase font-semibold">Total Owed To Me</div>
-          <div className="text-2xl font-bold text-amber-700">{formatKES(total)}</div>
+      <div className="flex items-center justify-between gap-3 no-print">
+        <div className="card bg-amber-50 border-amber-100 flex items-center gap-3 flex-1">
+          <AlertCircle className="text-amber-500" />
+          <div>
+            <div className="text-xs text-amber-700 uppercase font-semibold">Total Owed To Me</div>
+            <div className="text-2xl font-bold text-amber-700">{formatKES(total)}</div>
+          </div>
         </div>
+        <button onClick={handleExportCSV} className="btn-secondary flex items-center gap-1.5">
+          <Download size={15} /> Export CSV
+        </button>
       </div>
 
       {loading ? (

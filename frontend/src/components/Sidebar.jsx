@@ -38,10 +38,10 @@ export default function Sidebar({ open, onClose }) {
   return (
     <>
       {open && (
-        <div className="fixed inset-0 bg-black/30 z-30 lg:hidden" onClick={onClose} />
+        <div className="fixed inset-0 bg-black/30 z-30 lg:hidden no-print" onClick={onClose} />
       )}
       <aside
-        className={`fixed lg:static z-40 top-0 left-0 h-full w-64 bg-ink-900 text-slate-300 flex flex-col transition-transform duration-200 ${
+        className={`no-print fixed lg:static z-40 top-0 left-0 h-full w-64 bg-ink-900 text-slate-300 flex flex-col transition-transform duration-200 ${
           open ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         }`}
       >

@@ -24,7 +24,7 @@ export default function Topbar({ title, onMenuClick }) {
   };
 
   return (
-    <header className="bg-white border-b border-slate-100 sticky top-0 z-20">
+    <header className="no-print bg-white border-b border-slate-100 sticky top-0 z-20">
       <div className="flex items-center justify-between px-4 lg:px-6 py-3 gap-4">
         <div className="flex items-center gap-3">
           <button className="lg:hidden text-slate-500" onClick={onMenuClick}>
