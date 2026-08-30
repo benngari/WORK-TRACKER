@@ -16,6 +16,7 @@ export default function JobDetail() {
   const [job, setJob] = useState(null);
   const [tab, setTab] = useState('Overview');
   const [loading, setLoading] = useState(true);
+  const [editJobOpen, setEditJobOpen] = useState(false);
   const [repeatOpen, setRepeatOpen] = useState(false);
 
   const load = () => {
@@ -49,7 +50,7 @@ export default function JobDetail() {
           <button onClick={() => setEditJobOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
             <Pencil size={15} /> Edit Job
           </button>
-                    <button onClick={() => setRepeatOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
+          <button onClick={() => setRepeatOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
             <Copy size={15} /> Duplicate
           </button>
           <button onClick={handleTrash} className="flex items-center gap-1.5 text-sm text-red-500 hover:text-red-700">
@@ -110,7 +111,7 @@ export default function JobDetail() {
       {tab === 'Documents' && <DocumentsTab job={job} onChange={load} />}
       {tab === 'Notes' && <NotesTab job={job} onChange={load} />}
 
-            <EditJobModal open={editJobOpen} onClose={() => setEditJobOpen(false)} job={job} onSaved={load} />
+      <EditJobModal open={editJobOpen} onClose={() => setEditJobOpen(false)} job={job} onSaved={load} />
       {repeatOpen && (
         <RepeatJobModal
           job={job}
