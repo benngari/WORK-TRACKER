@@ -29,6 +29,17 @@ export default function ToastContainer() {
           >
             <Icon size={18} className="shrink-0 mt-0.5" />
             <span className="flex-1">{t.message}</span>
+            {t.action && (
+              <button
+                onClick={() => {
+                  t.action.onClick();
+                  dismiss(t.id);
+                }}
+                className="shrink-0 font-semibold underline underline-offset-2 hover:opacity-80"
+              >
+                {t.action.label}
+              </button>
+            )}
             <button onClick={() => dismiss(t.id)} className="shrink-0 opacity-70 hover:opacity-100">
               <X size={16} />
             </button>

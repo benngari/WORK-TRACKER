@@ -12,9 +12,10 @@ export function ToastProvider({ children }) {
   }, []);
 
   const push = useCallback(
-    (message, type = 'default', duration = 3500) => {
+    (message, type = 'default', options = {}) => {
+      const { duration = 3500, action = null } = options;
       const id = ++idCounter;
-      setToasts((prev) => [...prev, { id, message, type }]);
+      setToasts((prev) => [...prev, { id, message, type, action }]);
       if (duration > 0) {
         setTimeout(() => dismiss(id), duration);
       }
@@ -24,9 +25,9 @@ export function ToastProvider({ children }) {
   );
 
   const toast = {
-    success: (message, duration) => push(message, 'success', duration),
-    error: (message, duration) => push(message, 'error', duration),
-    info: (message, duration) => push(message, 'default', duration),
+    success: (message, options) => push(message, 'success', options),
+    error: (message, options) => push(message, 'error', options),
+    info: (message, options) => push(message, 'default', options),
   };
 
   return (
