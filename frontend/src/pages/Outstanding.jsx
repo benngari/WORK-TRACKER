@@ -16,9 +16,11 @@ export default function Outstanding() {
   }, []);
 
   const total = rows.reduce((s, r) => s + r.outstanding, 0);
+  const overdueCount = rows.filter((r) => r.isOverdue).length;
+  const overdueTotal = rows.filter((r) => r.isOverdue).reduce((s, r) => s + r.outstanding, 0);
 
   const handleExportCSV = () => {
-    const headers = ['Client', 'Site', 'Job Card', 'Expected', 'Paid', 'Outstanding', 'Last Attendance', 'Payment Due Date', 'Days Outstanding', 'Status'];
+    const headers = ['Client', 'Site', 'Job Card', 'Expected', 'Paid', 'Outstanding', 'Last Attendance', 'Payment Due Date', 'Days Outstanding', 'Overdue', 'Status'];
     const csvRows = rows.map((r) => [
       r.client || '',
       r.site || '',
@@ -29,6 +31,7 @@ export default function Outstanding() {
       formatDate(r.lastAttendance),
       formatDate(r.paymentDueDate),
       r.daysOutstanding ?? '',
+      r.isOverdue ? 'Yes' : 'No',
       r.status,
     ]);
     downloadCSV(`outstanding-payments-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
@@ -36,14 +39,23 @@ export default function Outstanding() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-3 no-print">
-        <div className="card bg-amber-50 border-amber-100 flex items-center gap-3 flex-1">
+      <div className="flex items-center justify-between gap-3 no-print flex-wrap">
+        <div className="card bg-amber-50 border-amber-100 flex items-center gap-3 flex-1 min-w-[220px]">
           <AlertCircle className="text-amber-500" />
           <div>
             <div className="text-xs text-amber-700 uppercase font-semibold">Total Owed To Me</div>
             <div className="text-2xl font-bold text-amber-700">{formatKES(total)}</div>
           </div>
         </div>
+        {overdueCount > 0 && (
+          <div className="card bg-red-50 border-red-100 flex items-center gap-3 flex-1 min-w-[220px]">
+            <AlertCircle className="text-red-500" />
+            <div>
+              <div className="text-xs text-red-700 uppercase font-semibold">Overdue ({overdueCount})</div>
+              <div className="text-2xl font-bold text-red-700">{formatKES(overdueTotal)}</div>
+            </div>
+          </div>
+        )}
         <button onClick={handleExportCSV} className="btn-secondary flex items-center gap-1.5">
           <Download size={15} /> Export CSV
         </button>
@@ -65,13 +77,19 @@ export default function Outstanding() {
                 <th className="py-2.5 px-4">Paid</th>
                 <th className="py-2.5 px-4">Outstanding</th>
                 <th className="py-2.5 px-4">Last Attendance</th>
-                <th className="py-2.5 px-4">Days Outstanding</th>
+                <th className="py-2.5 px-4">Due Date</th>
                 <th className="py-2.5 px-4">Status</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => (
-                <tr key={r.jobId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/jobs/${r.jobId}`)}>
+                <tr
+                  key={r.jobId}
+                  className={`border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer ${
+                    r.isOverdue ? 'bg-red-50/50' : ''
+                  }`}
+                  onClick={() => navigate(`/jobs/${r.jobId}`)}
+                >
                   <td className="py-2.5 px-4 font-medium text-ink-900">{r.client}</td>
                   <td className="py-2.5 px-4 text-slate-600">{r.site}</td>
                   <td className="py-2.5 px-4 text-slate-600">{r.jobCardRef || '-'}</td>
@@ -79,7 +97,13 @@ export default function Outstanding() {
                   <td className="py-2.5 px-4">{formatKES(r.paid)}</td>
                   <td className="py-2.5 px-4 font-semibold text-red-600">{formatKES(r.outstanding)}</td>
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(r.lastAttendance)}</td>
-                  <td className="py-2.5 px-4 text-slate-600">{r.daysOutstanding ?? '-'}</td>
+                  <td className="py-2.5 px-4">
+                    {r.isOverdue ? (
+                      <span className="text-red-600 font-medium">{formatDate(r.paymentDueDate)} · Overdue</span>
+                    ) : (
+                      <span className="text-slate-600">{formatDate(r.paymentDueDate)}</span>
+                    )}
+                  </td>
                   <td className="py-2.5 px-4"><StatusBadge status={r.status} /></td>
                 </tr>
               ))}

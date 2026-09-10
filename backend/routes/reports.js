@@ -6,5 +6,6 @@ const auth = require('../middleware/auth');
 router.use(auth);
 router.get('/ledger', ctrl.ledger);
 router.get('/outstanding', ctrl.outstanding);
+router.get('/overdue-summary', ctrl.overdueSummary);
 
 module.exports = router;

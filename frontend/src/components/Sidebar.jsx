@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -16,6 +17,7 @@ import {
   Settings,
   Wallet,
 } from 'lucide-react';
+import api from '../api/axios';
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -25,7 +27,7 @@ const navItems = [
   { to: '/attendance', label: 'Attendance', icon: CalendarCheck },
   { to: '/ledger', label: 'Payment Ledger', icon: Table2 },
   { to: '/mpesa', label: 'M-PESA Payments', icon: Smartphone },
-  { to: '/outstanding', label: 'Outstanding Payments', icon: AlertCircle },
+  { to: '/outstanding', label: 'Outstanding Payments', icon: AlertCircle, badgeKey: 'outstanding' },
   { to: '/documents', label: 'Job Cards / Documents', icon: FileText },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
@@ -35,6 +37,12 @@ const navItems = [
 ];
 
 export default function Sidebar({ open, onClose }) {
+  const [overdueCount, setOverdueCount] = useState(0);
+
+  useEffect(() => {
+    api.get('/reports/overdue-summary').then((res) => setOverdueCount(res.data.count)).catch(() => {});
+  }, []);
+
   return (
     <>
       {open && (
@@ -56,7 +64,7 @@ export default function Sidebar({ open, onClose }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto py-3 px-2 space-y-0.5">
-          {navItems.map(({ to, label, icon: Icon, end }) => (
+          {navItems.map(({ to, label, icon: Icon, end, badgeKey }) => (
             <NavLink
               key={to}
               to={to}
@@ -71,7 +79,12 @@ export default function Sidebar({ open, onClose }) {
               }
             >
               <Icon size={17} />
-              <span>{label}</span>
+              <span className="flex-1">{label}</span>
+              {badgeKey === 'outstanding' && overdueCount > 0 && (
+                <span className="bg-red-500 text-white text-[11px] font-semibold rounded-full min-w-[20px] h-5 flex items-center justify-center px-1.5">
+                  {overdueCount}
+                </span>
+              )}
             </NavLink>
           ))}
         </nav>

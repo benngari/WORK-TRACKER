@@ -8,6 +8,13 @@ const Site = require('../models/Site');
 
 function getPeriodRange(period) {
   const now = new Date();
+  if (period === 'week') {
+    const day = now.getDay();
+    const diffToMonday = day === 0 ? 6 : day - 1;
+    const from = new Date(now.getFullYear(), now.getMonth(), now.getDate() - diffToMonday);
+    const to = new Date(from.getFullYear(), from.getMonth(), from.getDate() + 6, 23, 59, 59, 999);
+    return { from, to };
+  }
   if (period === 'month') {
     const from = new Date(now.getFullYear(), now.getMonth(), 1);
     const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
@@ -24,7 +31,7 @@ function getPeriodRange(period) {
 exports.summary = async (req, res) => {
   try {
     const ownerFilter = { owner: req.user.id };
-    const period = ['month', 'year'].includes(req.query.period) ? req.query.period : 'all';
+    const period = ['week', 'month', 'year'].includes(req.query.period) ? req.query.period : 'all';
     const range = getPeriodRange(period);
 
     const jobs = await Job.find({ ...ownerFilter, deletedAt: null }).populate('client').populate('site');
