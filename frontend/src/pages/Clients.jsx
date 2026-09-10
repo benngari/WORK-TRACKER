@@ -119,6 +119,12 @@ export default function Clients() {
                 {c.phone && <div>{c.phone}</div>}
                 <div className="text-xs text-slate-400 mt-2">Default rate: {formatKES(c.defaultRate)}</div>
               </div>
+              <div className={`mt-3 pt-3 border-t border-slate-100 ${c.outstandingBalance > 0 ? '' : 'text-slate-400'}`}>
+                <div className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Owed to Me</div>
+                <div className={`text-lg font-bold ${c.outstandingBalance > 0 ? 'text-amber-600' : 'text-slate-400'}`}>
+                  {formatKES(c.outstandingBalance)}
+                </div>
+              </div>
             </div>
           ))}
         </div>

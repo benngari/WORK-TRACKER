@@ -2,15 +2,59 @@ const crudFactory = require('../utils/crudFactory');
 const Client = require('../models/Client');
 const Site = require('../models/Site');
 const Job = require('../models/Job');
+const Attendance = require('../models/Attendance');
+const PaymentAllocation = require('../models/PaymentAllocation');
 
 const base = crudFactory(Client, { sort: { name: 1 } });
 
-exports.list = base.list;
+exports.list = async (req, res) => {
+  try {
+    const clients = await Client.find({ owner: req.user.id }).sort({ name: 1 }).lean();
+    const jobs = await Job.find({ owner: req.user.id, deletedAt: null }).lean();
+    const jobIds = jobs.map((j) => j._id);
+
+    const [allAttendance, allAllocations] = await Promise.all([
+      Attendance.find({ job: { $in: jobIds }, owner: req.user.id }).lean(),
+      PaymentAllocation.find({ job: { $in: jobIds }, owner: req.user.id }).lean(),
+    ]);
+
+    const attendanceByJob = {};
+    for (const a of allAttendance) {
+      const key = String(a.job);
+      (attendanceByJob[key] = attendanceByJob[key] || []).push(a);
+    }
+    const paidByJob = {};
+    for (const a of allAllocations) {
+      if (a.allocationType === 'Fare') continue;
+      const key = String(a.job);
+      paidByJob[key] = (paidByJob[key] || 0) + a.amount;
+    }
+
+    const balanceByClient = {};
+    for (const job of jobs) {
+      const jobAttendance = attendanceByJob[String(job._id)] || [];
+      const expected = job.expectedPaymentOverride ?? jobAttendance.length * job.rate;
+      const paid = paidByJob[String(job._id)] || 0;
+      const outstanding = Math.max(0, expected - paid);
+      const key = String(job.client);
+      balanceByClient[key] = (balanceByClient[key] || 0) + outstanding;
+    }
+
+    const withBalance = clients.map((c) => ({
+      ...c,
+      outstandingBalance: balanceByClient[String(c._id)] || 0,
+    }));
+
+    res.json(withBalance);
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to fetch clients', error: err.message });
+  }
+};
+
 exports.getOne = base.getOne;
 exports.create = base.create;
 exports.update = base.update;
 
-// Block deleting a client that still has sites/jobs, to protect data integrity
 exports.remove = async (req, res) => {
   try {
     const siteCount = await Site.countDocuments({ client: req.params.id, owner: req.user.id });
@@ -28,7 +72,6 @@ exports.remove = async (req, res) => {
   }
 };
 
-// Client with a rollup of sites/jobs/financials - powers the "Bank & Site history" view
 exports.summary = async (req, res) => {
   try {
     const client = await Client.findOne({ _id: req.params.id, owner: req.user.id });
