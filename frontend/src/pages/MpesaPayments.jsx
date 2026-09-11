@@ -1,77 +1,133 @@
 import { useEffect, useState } from 'react';
-import { Plus, Smartphone, Link2, Upload } from 'lucide-react';
+import { Plus, Smartphone, Link2, Upload, Wallet } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate, siteLabel } from '../utils/format.js';
+import { useToast } from '../context/ToastContext.jsx';
 
 export default function MpesaPayments() {
   const [transactions, setTransactions] = useState([]);
+  const [manualPayments, setManualPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [pasteModalOpen, setPasteModalOpen] = useState(false);
+  const [manualModalOpen, setManualModalOpen] = useState(false);
   const [allocateModalOpen, setAllocateModalOpen] = useState(false);
   const [activeTx, setActiveTx] = useState(null);
 
   const load = () => {
     setLoading(true);
-    api.get('/mpesa').then((res) => setTransactions(res.data)).finally(() => setLoading(false));
+    Promise.all([api.get('/mpesa'), api.get('/payments')])
+      .then(([tx, payments]) => {
+        setTransactions(tx.data);
+        // Manual payments are Payment records with no linked M-PESA transaction
+        setManualPayments(payments.data.filter((p) => !p.mpesaTransaction));
+      })
+      .finally(() => setLoading(false));
   };
 
   useEffect(load, []);
 
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">
+    <div className="space-y-6">
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setManualModalOpen(true)} className="btn-secondary flex items-center gap-1.5">
+          <Wallet size={16} /> Add Manual Payment
+        </button>
         <button onClick={() => setPasteModalOpen(true)} className="btn-primary flex items-center gap-1.5">
           <Plus size={16} /> Add M-PESA Payment
         </button>
       </div>
 
-      {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
-      ) : transactions.length === 0 ? (
-        <div className="card text-center py-10 text-slate-400">
-          <Smartphone className="mx-auto mb-2" />
-          No M-PESA transactions yet. Paste a confirmation message to get started.
-        </div>
-      ) : (
-        <div className="card p-0 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-2.5 px-4">Code</th>
-                <th className="py-2.5 px-4">Amount</th>
-                <th className="py-2.5 px-4">Sender</th>
-                <th className="py-2.5 px-4">Date</th>
-                <th className="py-2.5 px-4">Unallocated</th>
-                <th className="py-2.5 px-4"></th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.map((t) => (
-                <tr key={t._id} className="border-b border-slate-50 last:border-0">
-                  <td className="py-2.5 px-4 font-mono text-xs text-ink-800">{t.transactionCode || '—'}</td>
-                  <td className="py-2.5 px-4 font-medium text-ink-900">{formatKES(t.amount)}</td>
-                  <td className="py-2.5 px-4 text-slate-600">{t.sender || '—'}</td>
-                  <td className="py-2.5 px-4 text-slate-600">{formatDate(t.transactionDate)}</td>
-                  <td className="py-2.5 px-4 text-amber-600 font-medium">{formatKES(t.unallocatedAmount)}</td>
-                  <td className="py-2.5 px-4 text-right">
-                    {t.unallocatedAmount > 0 && (
-                      <button
-                        onClick={() => { setActiveTx(t); setAllocateModalOpen(true); }}
-                        className="text-brand-600 text-xs font-medium flex items-center gap-1 ml-auto"
-                      >
-                        <Link2 size={13} /> Allocate
-                      </button>
-                    )}
-                  </td>
+      <div>
+        <h2 className="text-sm font-semibold text-ink-900 mb-2">M-PESA Transactions</h2>
+        {loading ? (
+          <div className="text-sm text-slate-400">Loading...</div>
+        ) : transactions.length === 0 ? (
+          <div className="card text-center py-10 text-slate-400">
+            <Smartphone className="mx-auto mb-2" />
+            No M-PESA transactions yet. Paste a confirmation message to get started.
+          </div>
+        ) : (
+          <div className="card p-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
+                  <th className="py-2.5 px-4">Code</th>
+                  <th className="py-2.5 px-4">Amount</th>
+                  <th className="py-2.5 px-4">Sender</th>
+                  <th className="py-2.5 px-4">Date</th>
+                  <th className="py-2.5 px-4">Unallocated</th>
+                  <th className="py-2.5 px-4"></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+              </thead>
+              <tbody>
+                {transactions.map((t) => (
+                  <tr key={t._id} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2.5 px-4 font-mono text-xs text-ink-800">{t.transactionCode || '—'}</td>
+                    <td className="py-2.5 px-4 font-medium text-ink-900">{formatKES(t.amount)}</td>
+                    <td className="py-2.5 px-4 text-slate-600">{t.sender || '—'}</td>
+                    <td className="py-2.5 px-4 text-slate-600">{formatDate(t.transactionDate)}</td>
+                    <td className="py-2.5 px-4 text-amber-600 font-medium">{formatKES(t.unallocatedAmount)}</td>
+                    <td className="py-2.5 px-4 text-right">
+                      {t.unallocatedAmount > 0 && (
+                        <button
+                          onClick={() => { setActiveTx(t); setAllocateModalOpen(true); }}
+                          className="text-brand-600 text-xs font-medium flex items-center gap-1 ml-auto"
+                        >
+                          <Link2 size={13} /> Allocate
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <h2 className="text-sm font-semibold text-ink-900 mb-2">Other Payments (Cash, Bank Transfer, etc.)</h2>
+        {loading ? (
+          <div className="text-sm text-slate-400">Loading...</div>
+        ) : manualPayments.length === 0 ? (
+          <div className="card text-center py-10 text-slate-400">
+            <Wallet className="mx-auto mb-2" />
+            No manual payments recorded yet.
+          </div>
+        ) : (
+          <div className="card p-0 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
+                  <th className="py-2.5 px-4">Method</th>
+                  <th className="py-2.5 px-4">Amount</th>
+                  <th className="py-2.5 px-4">Reference</th>
+                  <th className="py-2.5 px-4">Date</th>
+                  <th className="py-2.5 px-4">Unallocated</th>
+                </tr>
+              </thead>
+              <tbody>
+                {manualPayments.map((p) => (
+                  <tr key={p._id} className="border-b border-slate-50 last:border-0">
+                    <td className="py-2.5 px-4 text-ink-800">{p.method}</td>
+                    <td className="py-2.5 px-4 font-medium text-ink-900">{formatKES(p.amount)}</td>
+                    <td className="py-2.5 px-4 text-slate-600">{p.reference || '—'}</td>
+                    <td className="py-2.5 px-4 text-slate-600">{formatDate(p.receivedDate)}</td>
+                    <td className="py-2.5 px-4 text-amber-600 font-medium">{formatKES(p.unallocated)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="px-4 py-2 text-xs text-slate-400 border-t border-slate-100">
+              Allocate these to jobs from the job's Payments tab, or from a job's page directly.
+            </div>
+          </div>
+        )}
+      </div>
 
       <PasteParseModal open={pasteModalOpen} onClose={() => setPasteModalOpen(false)} onSaved={load} />
+      <ManualPaymentModal open={manualModalOpen} onClose={() => setManualModalOpen(false)} onSaved={load} />
       {activeTx && (
         <AllocateModal
           open={allocateModalOpen}
@@ -81,6 +137,76 @@ export default function MpesaPayments() {
         />
       )}
     </div>
+  );
+}
+
+function ManualPaymentModal({ open, onClose, onSaved }) {
+  const toast = useToast();
+  const [method, setMethod] = useState('Cash');
+  const [amount, setAmount] = useState('');
+  const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
+  const [reference, setReference] = useState('');
+  const [notes, setNotes] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+
+  const reset = () => {
+    setMethod('Cash');
+    setAmount('');
+    setReceivedDate(new Date().toISOString().slice(0, 10));
+    setReference('');
+    setNotes('');
+    setError('');
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    setError('');
+    try {
+      await api.post('/payments', { method, amount: Number(amount), receivedDate, reference, notes });
+      toast.success('Payment recorded');
+      onSaved();
+      onClose();
+      reset();
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to save payment');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open={open} onClose={() => { onClose(); reset(); }} title="Add Manual Payment">
+      <form onSubmit={handleSubmit} className="space-y-3">
+        {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
+        <div>
+          <label className="label">Method</label>
+          <select className="input" value={method} onChange={(e) => setMethod(e.target.value)}>
+            <option>Cash</option>
+            <option>Bank Transfer</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label className="label">Amount</label>
+          <input required type="number" className="input" value={amount} onChange={(e) => setAmount(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Date Received</label>
+          <input required type="date" className="input" value={receivedDate} onChange={(e) => setReceivedDate(e.target.value)} />
+        </div>
+        <div>
+          <label className="label">Reference (optional)</label>
+          <input className="input" value={reference} onChange={(e) => setReference(e.target.value)} placeholder="e.g. cheque number, bank ref" />
+        </div>
+        <div>
+          <label className="label">Notes (optional)</label>
+          <textarea className="input" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        </div>
+        <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Save Payment'}</button>
+      </form>
+    </Modal>
   );
 }
 
@@ -197,7 +323,7 @@ function PasteParseModal({ open, onClose, onSaved }) {
               <input className="input" value={parsed.transactionCode || ''} onChange={(e) => setParsed({ ...parsed, transactionCode: e.target.value.toUpperCase() })} />
             </div>
             <div>
-              <label className="label">Amount (KES)</label>
+              <label className="label">Amount</label>
               <input type="number" className="input" value={parsed.amount || ''} onChange={(e) => setParsed({ ...parsed, amount: Number(e.target.value) })} />
             </div>
             <div>
