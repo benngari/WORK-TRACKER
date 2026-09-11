@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -8,6 +8,7 @@ import { formatKES, formatDate, siteLabel, getThumbnailUrl } from '../utils/form
 import { useToast } from '../context/ToastContext.jsx';
 
 const tabs = ['Overview', 'Attendance', 'Payments', 'Documents', 'Notes'];
+const UNDO_WINDOW_MS = 5000;
 
 export default function JobDetail() {
   const { id } = useParams();
@@ -318,18 +319,32 @@ function Row({ label, value }) {
   );
 }
 
+// Deletes with a 5-second Undo window instead of firing immediately: the row
+// hides right away, but the real API delete is delayed and can be cancelled.
+// Also supports adding multiple attendance dates in one go ("bulk mode"),
+// for jobs visited on several (possibly non-consecutive) days.
 function AttendanceTab({ job, onChange }) {
   const toast = useToast();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [bulkMode, setBulkMode] = useState(false);
   const [form, setForm] = useState(emptyAttendanceForm(job.rate));
+  const [bulkDates, setBulkDates] = useState(['']);
   const [fareNeeded, setFareNeeded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [pendingDeleteIds, setPendingDeleteIds] = useState(new Set());
+  const timersRef = useRef({});
+
+  useEffect(() => () => {
+    Object.values(timersRef.current).forEach((t) => clearTimeout(t));
+  }, []);
 
   const openAdd = () => {
     setEditingId(null);
+    setBulkMode(false);
     setForm(emptyAttendanceForm(job.rate));
+    setBulkDates(['']);
     setFareNeeded(false);
     setError('');
     setModalOpen(true);
@@ -337,6 +352,7 @@ function AttendanceTab({ job, onChange }) {
 
   const openEdit = (a) => {
     setEditingId(a._id);
+    setBulkMode(false);
     setForm({
       date: a.date ? a.date.slice(0, 10) : '',
       startTime: a.startTime || '',
@@ -351,10 +367,50 @@ function AttendanceTab({ job, onChange }) {
     setModalOpen(true);
   };
 
+  const updateBulkDate = (index, value) => {
+    setBulkDates((prev) => prev.map((d, i) => (i === index ? value : d)));
+  };
+
+  const addBulkDateField = () => setBulkDates((prev) => [...prev, '']);
+
+  const removeBulkDateField = (index) => {
+    setBulkDates((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
     setError('');
+
+    if (bulkMode) {
+      const validDates = bulkDates.map((d) => d.trim()).filter(Boolean);
+      if (validDates.length === 0) {
+        setError('Add at least one date');
+        setSaving(false);
+        return;
+      }
+      try {
+        for (const date of validDates) {
+          await api.post('/attendance', {
+            job: job._id,
+            date,
+            rate: form.rate,
+            shift: form.shift,
+            fare: fareNeeded ? form.fare : 0,
+            notes: form.notes,
+          });
+        }
+        toast.success(`${validDates.length} attendance record${validDates.length > 1 ? 's' : ''} added`);
+        setModalOpen(false);
+        onChange();
+      } catch (err) {
+        setError(err.response?.data?.message || 'Failed to save some attendance records');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     const payload = { ...form, fare: fareNeeded ? form.fare : 0 };
     try {
       if (editingId) {
@@ -373,16 +429,43 @@ function AttendanceTab({ job, onChange }) {
     }
   };
 
-  const handleDelete = async (attId) => {
-    if (!confirm('Delete this attendance record?')) return;
-    try {
-      await api.delete(`/attendance/${attId}`);
-      toast.success('Attendance deleted');
-      onChange();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to delete attendance');
-    }
+  const handleDelete = (attId) => {
+    setPendingDeleteIds((prev) => new Set(prev).add(attId));
+
+    const timeoutId = setTimeout(async () => {
+      delete timersRef.current[attId];
+      try {
+        await api.delete(`/attendance/${attId}`);
+        onChange();
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to delete attendance');
+        setPendingDeleteIds((prev) => {
+          const next = new Set(prev);
+          next.delete(attId);
+          return next;
+        });
+      }
+    }, UNDO_WINDOW_MS);
+    timersRef.current[attId] = timeoutId;
+
+    toast.info('Attendance record deleted', {
+      duration: UNDO_WINDOW_MS + 300,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timersRef.current[attId]);
+          delete timersRef.current[attId];
+          setPendingDeleteIds((prev) => {
+            const next = new Set(prev);
+            next.delete(attId);
+            return next;
+          });
+        },
+      },
+    });
   };
+
+  const visibleAttendance = (job.attendance || []).filter((a) => !pendingDeleteIds.has(a._id));
 
   return (
     <div className="space-y-3">
@@ -404,7 +487,7 @@ function AttendanceTab({ job, onChange }) {
             </tr>
           </thead>
           <tbody>
-            {(job.attendance || []).map((a) => (
+            {visibleAttendance.map((a) => (
               <tr key={a._id} className="border-b border-slate-50 last:border-0">
                 <td className="py-2 px-4">{formatDate(a.date)}</td>
                 <td className="py-2 px-4 text-slate-500">{a.startTime || '-'}{a.endTime ? ` - ${a.endTime}` : ''}</td>
@@ -427,7 +510,7 @@ function AttendanceTab({ job, onChange }) {
             ))}
           </tbody>
         </table>
-        {(!job.attendance || job.attendance.length === 0) && (
+        {visibleAttendance.length === 0 && (
           <div className="text-center py-8 text-sm text-slate-400">
             No attendance recorded for this job yet.
           </div>
@@ -437,20 +520,76 @@ function AttendanceTab({ job, onChange }) {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editingId ? 'Edit Attendance' : 'Record Attendance'}>
         <form onSubmit={handleSubmit} className="space-y-3">
           {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
-          <div>
-            <label className="label">Date</label>
-            <input required type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="label">Start Time</label>
-              <input type="time" className="input" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+
+          {!editingId && (
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setBulkMode(false)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
+                  !bulkMode ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+                }`}
+              >
+                Single Date
+              </button>
+              <button
+                type="button"
+                onClick={() => setBulkMode(true)}
+                className={`flex-1 py-2 rounded-lg text-sm font-medium border ${
+                  bulkMode ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+                }`}
+              >
+                Multiple Dates
+              </button>
             </div>
+          )}
+
+          {bulkMode ? (
             <div>
-              <label className="label">End Time</label>
-              <input type="time" className="input" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+              <label className="label">Dates ({bulkDates.filter((d) => d).length} added)</label>
+              <div className="space-y-2">
+                {bulkDates.map((d, i) => (
+                  <div key={i} className="flex gap-2">
+                    <input
+                      type="date"
+                      className="input"
+                      value={d}
+                      onChange={(e) => updateBulkDate(i, e.target.value)}
+                    />
+                    {bulkDates.length > 1 && (
+                      <button type="button" onClick={() => removeBulkDateField(i)} className="text-slate-400 hover:text-red-500 shrink-0">
+                        <X size={18} />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              <button type="button" onClick={addBulkDateField} className="text-brand-600 text-xs font-medium mt-2">
+                + Add Another Date
+              </button>
+              <p className="text-xs text-slate-400 mt-2">
+                All dates share the same shift, rate, fare and notes below.
+              </p>
             </div>
-          </div>
+          ) : (
+            <div>
+              <label className="label">Date</label>
+              <input required type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+            </div>
+          )}
+
+          {!bulkMode && (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Start Time</label>
+                <input type="time" className="input" value={form.startTime} onChange={(e) => setForm({ ...form, startTime: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">End Time</label>
+                <input type="time" className="input" value={form.endTime} onChange={(e) => setForm({ ...form, endTime: e.target.value })} />
+              </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Day/Night</label>
@@ -475,11 +614,11 @@ function AttendanceTab({ job, onChange }) {
                   if (!e.target.checked) setForm({ ...form, fare: 0 });
                 }}
               />
-              Was fare needed for this job?
+              Was fare needed for {bulkMode ? 'these visits' : 'this job'}?
             </label>
             {fareNeeded && (
               <div>
-                <label className="label">Fare Amount (KES)</label>
+                <label className="label">Fare Amount (KES{bulkMode ? ' per visit' : ''})</label>
                 <input
                   type="number"
                   className="input"
@@ -495,7 +634,13 @@ function AttendanceTab({ job, onChange }) {
             <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
           <button disabled={saving} className="btn-primary w-full">
-            {saving ? 'Saving...' : editingId ? 'Save Changes' : 'Save Attendance'}
+            {saving
+              ? 'Saving...'
+              : bulkMode
+              ? `Save ${bulkDates.filter((d) => d).length} Attendance Record${bulkDates.filter((d) => d).length !== 1 ? 's' : ''}`
+              : editingId
+              ? 'Save Changes'
+              : 'Save Attendance'}
           </button>
         </form>
       </Modal>
@@ -522,6 +667,13 @@ function PaymentsTab({ job, onChange }) {
   const [editType, setEditType] = useState('Payment');
   const [editSaving, setEditSaving] = useState(false);
   const [editError, setEditError] = useState('');
+
+  const [pendingRemoveIds, setPendingRemoveIds] = useState(new Set());
+  const timersRef = useRef({});
+
+  useEffect(() => () => {
+    Object.values(timersRef.current).forEach((t) => clearTimeout(t));
+  }, []);
 
   const loadAvailablePayments = () => {
     setLoadingPayments(true);
@@ -585,17 +737,44 @@ function PaymentsTab({ job, onChange }) {
     }
   };
 
-  const removeAllocation = async (allocationId) => {
-    if (!confirm('Remove this payment allocation from the job? The amount becomes unallocated again.')) return;
-    try {
-      await api.delete(`/payments/allocations/${allocationId}`);
-      toast.success('Allocation removed');
-      loadAvailablePayments();
-      onChange();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to remove allocation');
-    }
+  const removeAllocation = (allocationId) => {
+    setPendingRemoveIds((prev) => new Set(prev).add(allocationId));
+
+    const timeoutId = setTimeout(async () => {
+      delete timersRef.current[allocationId];
+      try {
+        await api.delete(`/payments/allocations/${allocationId}`);
+        loadAvailablePayments();
+        onChange();
+      } catch (err) {
+        toast.error(err.response?.data?.message || 'Failed to remove allocation');
+        setPendingRemoveIds((prev) => {
+          const next = new Set(prev);
+          next.delete(allocationId);
+          return next;
+        });
+      }
+    }, UNDO_WINDOW_MS);
+    timersRef.current[allocationId] = timeoutId;
+
+    toast.info('Payment allocation removed', {
+      duration: UNDO_WINDOW_MS + 300,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          clearTimeout(timersRef.current[allocationId]);
+          delete timersRef.current[allocationId];
+          setPendingRemoveIds((prev) => {
+            const next = new Set(prev);
+            next.delete(allocationId);
+            return next;
+          });
+        },
+      },
+    });
   };
+
+  const visibleAllocations = (job.allocations || []).filter((a) => !pendingRemoveIds.has(a._id));
 
   return (
     <div className="space-y-4">
@@ -671,10 +850,10 @@ function PaymentsTab({ job, onChange }) {
         <div className="font-semibold text-ink-900 text-sm">Payments Allocated to This Job</div>
         {editError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{editError}</div>}
         <div className="divide-y divide-slate-50">
-          {(job.allocations || []).length === 0 && (
+          {visibleAllocations.length === 0 && (
             <div className="text-sm text-slate-400 py-4">No payments allocated to this job yet.</div>
           )}
-          {(job.allocations || []).map((a) => (
+          {visibleAllocations.map((a) => (
             <div key={a._id} className="py-2.5">
               <div className="flex justify-between items-start">
                 <div>

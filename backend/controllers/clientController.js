@@ -7,6 +7,8 @@ const PaymentAllocation = require('../models/PaymentAllocation');
 
 const base = crudFactory(Client, { sort: { name: 1 } });
 
+// List clients with each one's current outstanding balance attached -
+// batched into a few queries total rather than one per client.
 exports.list = async (req, res) => {
   try {
     const clients = await Client.find({ owner: req.user.id }).sort({ name: 1 }).lean();
@@ -55,6 +57,7 @@ exports.getOne = base.getOne;
 exports.create = base.create;
 exports.update = base.update;
 
+// Block deleting a client that still has sites/jobs, to protect data integrity
 exports.remove = async (req, res) => {
   try {
     const siteCount = await Site.countDocuments({ client: req.params.id, owner: req.user.id });
@@ -72,6 +75,7 @@ exports.remove = async (req, res) => {
   }
 };
 
+// Client with a rollup of sites/jobs/financials - powers the "Bank & Site history" view
 exports.summary = async (req, res) => {
   try {
     const client = await Client.findOne({ _id: req.params.id, owner: req.user.id });
