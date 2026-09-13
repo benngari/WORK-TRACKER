@@ -14,6 +14,11 @@ exports.register = async (req, res) => {
     if (process.env.ALLOW_SELF_REGISTER === 'false') {
       return res.status(403).json({ message: 'Registration is disabled on this deployment' });
     }
+
+    if (req.body.website) {
+      return res.status(400).json({ message: 'Registration failed' });
+    }
+
     const { name, email, password } = req.body;
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email and password are required' });

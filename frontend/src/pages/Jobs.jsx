@@ -13,6 +13,21 @@ const emptyForm = {
   date: new Date().toISOString().slice(0, 10), fare: 0,
 };
 
+const emptyQuickClient = { name: '', type: 'Direct Client', contactPerson: '', phone: '', defaultRate: 1500 };
+const emptyQuickSite = {
+  siteType: 'Bank', bankName: '', branch: '', branchCode: '',
+  siteName: '', town: '', county: '', isNairobi: false,
+};
+
+function loadStoredFilters() {
+  try {
+    const raw = localStorage.getItem('wt_job_filters');
+    return raw ? JSON.parse(raw) : { client: '', status: '' };
+  } catch {
+    return { client: '', status: '' };
+  }
+}
+
 export default function Jobs() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -24,8 +39,16 @@ export default function Jobs() {
   const [form, setForm] = useState(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [filters, setFilters] = useState({ client: '', status: '' });
+  const [filters, setFilters] = useState(loadStoredFilters);
   const [repeatJob, setRepeatJob] = useState(null);
+
+  const [quickClientOpen, setQuickClientOpen] = useState(false);
+  const [quickClientForm, setQuickClientForm] = useState(emptyQuickClient);
+  const [quickClientSaving, setQuickClientSaving] = useState(false);
+
+  const [quickSiteOpen, setQuickSiteOpen] = useState(false);
+  const [quickSiteForm, setQuickSiteForm] = useState(emptyQuickSite);
+  const [quickSiteSaving, setQuickSiteSaving] = useState(false);
 
   const load = () => {
     setLoading(true);
@@ -42,6 +65,11 @@ export default function Jobs() {
   };
 
   useEffect(load, [filters]);
+
+  const updateFilters = (next) => {
+    setFilters(next);
+    localStorage.setItem('wt_job_filters', JSON.stringify(next));
+  };
 
   const clientSites = sites.filter((s) => s.client?._id === form.client);
 
@@ -73,15 +101,49 @@ export default function Jobs() {
     }
   };
 
+  const handleQuickClientSubmit = async (e) => {
+    e.preventDefault();
+    setQuickClientSaving(true);
+    try {
+      const { data: newClient } = await api.post('/clients', quickClientForm);
+      toast.success('Client added');
+      setClients((prev) => [...prev, newClient].sort((a, b) => a.name.localeCompare(b.name)));
+      setForm((prev) => ({ ...prev, client: newClient._id, site: '', rate: newClient.defaultRate || prev.rate }));
+      setQuickClientOpen(false);
+      setQuickClientForm(emptyQuickClient);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add client');
+    } finally {
+      setQuickClientSaving(false);
+    }
+  };
+
+  const handleQuickSiteSubmit = async (e) => {
+    e.preventDefault();
+    setQuickSiteSaving(true);
+    try {
+      const { data: newSite } = await api.post('/sites', { ...quickSiteForm, client: form.client });
+      toast.success('Site added');
+      setSites((prev) => [...prev, newSite]);
+      setForm((prev) => ({ ...prev, site: newSite._id }));
+      setQuickSiteOpen(false);
+      setQuickSiteForm(emptyQuickSite);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to add site');
+    } finally {
+      setQuickSiteSaving(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-2">
-          <select className="input max-w-xs" value={filters.client} onChange={(e) => setFilters({ ...filters, client: e.target.value })}>
+          <select className="input max-w-xs" value={filters.client} onChange={(e) => updateFilters({ ...filters, client: e.target.value })}>
             <option value="">All Clients</option>
             {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
           </select>
-          <select className="input max-w-xs" value={filters.status} onChange={(e) => setFilters({ ...filters, status: e.target.value })}>
+          <select className="input max-w-xs" value={filters.status} onChange={(e) => updateFilters({ ...filters, status: e.target.value })}>
             <option value="">All Statuses</option>
             <option>Open</option>
             <option>In Progress</option>
@@ -158,7 +220,12 @@ export default function Jobs() {
           {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="label">Client</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="label mb-0">Client</label>
+                <button type="button" onClick={() => setQuickClientOpen(true)} className="text-xs text-brand-600 font-medium">
+                  + New Client
+                </button>
+              </div>
               <select required className="input" value={form.client} onChange={(e) => {
                 const client = clients.find((c) => c._id === e.target.value);
                 setForm({ ...form, client: e.target.value, site: '', rate: client?.defaultRate || 1500 });
@@ -168,7 +235,17 @@ export default function Jobs() {
               </select>
             </div>
             <div>
-              <label className="label">Site</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="label mb-0">Site</label>
+                <button
+                  type="button"
+                  onClick={() => setQuickSiteOpen(true)}
+                  disabled={!form.client}
+                  className="text-xs text-brand-600 font-medium disabled:text-slate-300"
+                >
+                  + New Site
+                </button>
+              </div>
               <select required className="input" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} disabled={!form.client}>
                 <option value="">Select site...</option>
                 {clientSites.map((s) => <option key={s._id} value={s._id}>{siteLabel(s)}</option>)}
@@ -182,11 +259,11 @@ export default function Jobs() {
               <input required type="date" className="input" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
             </div>
             <div>
-              <label className="label">Rate (KES)</label>
+              <label className="label">Rate</label>
               <input type="number" className="input" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
             </div>
             <div>
-              <label className="label">Fare (KES)</label>
+              <label className="label">Fare</label>
               <input type="number" className="input" value={form.fare} onChange={(e) => setForm({ ...form, fare: Number(e.target.value) })} />
             </div>
           </div>
@@ -225,6 +302,76 @@ export default function Jobs() {
             <textarea className="input" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
           </div>
           <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Create Job'}</button>
+        </form>
+      </Modal>
+
+      {/* Inline quick-add: create a client without leaving the New Job flow */}
+      <Modal open={quickClientOpen} onClose={() => setQuickClientOpen(false)} title="Quick Add Client">
+        <form onSubmit={handleQuickClientSubmit} className="space-y-3">
+          <div>
+            <label className="label">Name</label>
+            <input required className="input" value={quickClientForm.name} onChange={(e) => setQuickClientForm({ ...quickClientForm, name: e.target.value })} />
+          </div>
+          <div>
+            <label className="label">Type</label>
+            <select className="input" value={quickClientForm.type} onChange={(e) => setQuickClientForm({ ...quickClientForm, type: e.target.value })}>
+              <option>Contractor</option>
+              <option>Direct Client</option>
+              <option>Agency</option>
+              <option>Other</option>
+            </select>
+          </div>
+          <div>
+            <label className="label">Default Rate</label>
+            <input type="number" className="input" value={quickClientForm.defaultRate} onChange={(e) => setQuickClientForm({ ...quickClientForm, defaultRate: Number(e.target.value) })} />
+          </div>
+          <button disabled={quickClientSaving} className="btn-primary w-full">{quickClientSaving ? 'Saving...' : 'Add Client & Continue'}</button>
+        </form>
+      </Modal>
+
+      {/* Inline quick-add: create a site without leaving the New Job flow */}
+      <Modal open={quickSiteOpen} onClose={() => setQuickSiteOpen(false)} title="Quick Add Site">
+        <form onSubmit={handleQuickSiteSubmit} className="space-y-3">
+          <div>
+            <label className="label">Site Type</label>
+            <select className="input" value={quickSiteForm.siteType} onChange={(e) => setQuickSiteForm({ ...quickSiteForm, siteType: e.target.value })}>
+              <option>Bank</option>
+              <option>Office</option>
+              <option>Shop</option>
+              <option>Warehouse</option>
+              <option>Institution</option>
+              <option>Customer Premises</option>
+              <option>Other</option>
+            </select>
+          </div>
+          {quickSiteForm.siteType === 'Bank' ? (
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="label">Bank Name</label>
+                <input required className="input" value={quickSiteForm.bankName} onChange={(e) => setQuickSiteForm({ ...quickSiteForm, bankName: e.target.value })} />
+              </div>
+              <div>
+                <label className="label">Branch</label>
+                <input required className="input" value={quickSiteForm.branch} onChange={(e) => setQuickSiteForm({ ...quickSiteForm, branch: e.target.value })} />
+              </div>
+            </div>
+          ) : (
+            <div>
+              <label className="label">Site Name</label>
+              <input required className="input" value={quickSiteForm.siteName} onChange={(e) => setQuickSiteForm({ ...quickSiteForm, siteName: e.target.value })} />
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Town</label>
+              <input className="input" value={quickSiteForm.town} onChange={(e) => setQuickSiteForm({ ...quickSiteForm, town: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">County</label>
+              <input className="input" value={quickSiteForm.county} onChange={(e) => setQuickSiteForm({ ...quickSiteForm, county: e.target.value })} />
+            </div>
+          </div>
+          <button disabled={quickSiteSaving} className="btn-primary w-full">{quickSiteSaving ? 'Saving...' : 'Add Site & Continue'}</button>
         </form>
       </Modal>
 
@@ -280,7 +427,7 @@ function RepeatJobModal({ job, onClose, onDone }) {
           <input required type="date" className="input" value={date} onChange={(e) => setDate(e.target.value)} />
         </div>
         <div>
-          <label className="label">Fare (KES)</label>
+          <label className="label">Fare</label>
           <input type="number" className="input" value={fare} onChange={(e) => setFare(Number(e.target.value))} />
         </div>
         <button disabled={saving} className="btn-primary w-full">{saving ? 'Creating...' : 'Create Repeat Job'}</button>

@@ -9,11 +9,15 @@ export default function Register() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [website, setWebsite] = useState('');
   const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    if (website) {
+      return;
+    }
     const res = await register(name, email, password);
     if (res.success) navigate('/');
     else setError(res.message);
@@ -57,6 +61,20 @@ export default function Register() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+
+          <div style={{ position: 'absolute', left: '-9999px', top: '-9999px' }} aria-hidden="true">
+            <label htmlFor="website">Website</label>
+            <input
+              type="text"
+              id="website"
+              name="website"
+              tabIndex={-1}
+              autoComplete="off"
+              value={website}
+              onChange={(e) => setWebsite(e.target.value)}
+            />
+          </div>
+
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? 'Creating account...' : 'Create Account'}
           </button>
