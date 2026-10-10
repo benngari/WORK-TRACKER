@@ -1,8 +1,10 @@
+// Small helper to avoid repeating identical CRUD boilerplate across
+// simple owner-scoped models (Client, Site, Transport, HistoricalRecord...).
 function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) {
   return {
     list: async (req, res) => {
       try {
-        let query = Model.find({ owner: req.user.id }).sort(sort).lean();
+        let query = Model.find({ owner: req.user.id }).sort(sort);
         if (populate) query = query.populate(populate);
         const items = await query;
         res.json(items);
@@ -13,7 +15,7 @@ function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) 
 
     getOne: async (req, res) => {
       try {
-        let query = Model.findOne({ _id: req.params.id, owner: req.user.id }).lean();
+        let query = Model.findOne({ _id: req.params.id, owner: req.user.id });
         if (populate) query = query.populate(populate);
         const item = await query;
         if (!item) return res.status(404).json({ message: 'Not found' });
@@ -23,9 +25,18 @@ function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) 
       }
     },
 
+    // Populates the newly created record before returning it (when this
+    // model has a populate option configured), so a freshly-created record
+    // has the same shape as one fetched from the list endpoint. Without
+    // this, code that optimistically appends a create-response into local
+    // state (e.g. quick-add flows) sees unpopulated references and can't
+    // match them against already-loaded, populated data.
     create: async (req, res) => {
       try {
-        const item = await Model.create({ ...req.body, owner: req.user.id });
+        let item = await Model.create({ ...req.body, owner: req.user.id });
+        if (populate) {
+          item = await Model.findById(item._id).populate(populate);
+        }
         res.status(201).json(item);
       } catch (err) {
         if (err.code === 11000) {
@@ -37,12 +48,15 @@ function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) 
 
     update: async (req, res) => {
       try {
-        const item = await Model.findOneAndUpdate(
+        let item = await Model.findOneAndUpdate(
           { _id: req.params.id, owner: req.user.id },
           req.body,
           { new: true, runValidators: true }
         );
         if (!item) return res.status(404).json({ message: 'Not found' });
+        if (populate) {
+          item = await Model.findById(item._id).populate(populate);
+        }
         res.json(item);
       } catch (err) {
         res.status(400).json({ message: 'Failed to update record', error: err.message });

@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import api from '../api/axios';
 import StatCard from '../components/StatCard.jsx';
+import OnboardingChecklist from '../components/OnboardingChecklist.jsx';
 import { formatKES } from '../utils/format.js';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
@@ -12,6 +13,7 @@ const COLORS = ['#26a873', '#7ad9ae', '#48c28c', '#146d4c', '#aeeacd', '#18885d'
 
 const periodLabels = {
   all: 'All Time',
+  week: 'This Week',
   month: 'This Month',
   year: 'This Year',
 };
@@ -37,12 +39,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <OnboardingChecklist />
+
       <div className="flex items-center justify-between flex-wrap gap-3">
         <Tabs value={period} onValueChange={setPeriod}>
           <TabsList>
             <TabsTrigger value="all">All Time</TabsTrigger>
-            <TabsTrigger value="month">This Month</TabsTrigger>
             <TabsTrigger value="year">This Year</TabsTrigger>
+            <TabsTrigger value="month">This Month</TabsTrigger>
+            <TabsTrigger value="week">This Week</TabsTrigger>
           </TabsList>
         </Tabs>
       </div>

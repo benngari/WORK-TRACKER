@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto');
 const User = require('../models/User');
 const Settings = require('../models/Settings');
+const { sendPasswordResetEmail } = require('../utils/email');
 
 function signToken(user) {
   return jwt.sign({ id: user._id, email: user.email }, process.env.JWT_SECRET, {
@@ -69,5 +71,59 @@ exports.me = async (req, res) => {
     res.json(user);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch profile', error: err.message });
+  }
+};
+
+// Always responds the same way whether or not the account exists, so this
+// endpoint can't be used to check which emails are registered.
+exports.forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    if (!email) return res.status(400).json({ message: 'Email is required' });
+
+    const user = await User.findOne({ email: email.toLowerCase() });
+    if (user) {
+      const rawToken = crypto.randomBytes(32).toString('hex');
+      const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+      user.resetPasswordToken = hashedToken;
+      user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+      await user.save();
+
+      const resetUrl = `${process.env.FRONTEND_URL}/reset-password/${rawToken}`;
+      try {
+        await sendPasswordResetEmail(user.email, resetUrl);
+      } catch (emailErr) {
+        console.error('Failed to send reset email:', emailErr.message);
+      }
+    }
+
+    res.json({ message: 'If an account with that email exists, a reset link has been sent.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to process request', error: err.message });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters' });
+    }
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await User.findOne({
+      resetPasswordToken: hashedToken,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+    if (!user) {
+      return res.status(400).json({ message: 'This reset link is invalid or has expired' });
+    }
+    user.passwordHash = await bcrypt.hash(password, 10);
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpires = undefined;
+    await user.save();
+    res.json({ message: 'Password has been reset. You can now sign in.' });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to reset password', error: err.message });
   }
 };

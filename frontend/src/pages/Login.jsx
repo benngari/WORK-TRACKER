@@ -43,14 +43,19 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="label">Password</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="label mb-0">Password</label>
+              <Link to="/forgot-password" className="text-xs text-brand-600 font-medium">
+                Forgot password?
+              </Link>
+            </div>
             <input
               type="password"
               required
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
+              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full">
