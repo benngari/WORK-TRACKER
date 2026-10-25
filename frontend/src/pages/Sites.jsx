@@ -29,11 +29,23 @@ export default function Sites() {
   const [error, setError] = useState('');
   const [duplicateWarning, setDuplicateWarning] = useState(null);
   const [filterClient, setFilterClient] = useState('');
+  const [visitStats, setVisitStats] = useState({});
 
   const load = () => {
     setLoading(true);
-    Promise.all([api.get('/sites'), api.get('/clients')])
-      .then(([s, c]) => {
+    Promise.all([api.get('/sites'), api.get('/clients'), api.get('/attendance')])
+      .then(([s, c, a]) => {
+        // Count visits and find the latest attended date for each site
+        const stats = {};
+        a.data.forEach((r) => {
+          const id = r.job?.site?._id;
+          if (!id || r.job?.deletedAt) return;
+          const t = new Date(r.date).getTime();
+          const st = stats[id] || (stats[id] = { visits: 0, last: null });
+          st.visits += 1;
+          if (st.last === null || t > st.last) st.last = t;
+        });
+        setVisitStats(stats);
         setSites(s.data);
         setClients(c.data);
       })
@@ -47,6 +59,8 @@ export default function Sites() {
     site: (s) => siteLabel(s),
     client: (s) => s.client?.name,
     createdAt: (s) => (s.createdAt ? new Date(s.createdAt).getTime() : null),
+    visits: (s) => visitStats[s._id]?.visits ?? 0,
+    lastAttended: (s) => visitStats[s._id]?.last ?? null,
   });
 
   const openAdd = () => {
@@ -170,6 +184,8 @@ export default function Sites() {
                 <SortTh label="Type" k="siteType" sort={sort} onSort={toggle} className={th} />
                 <SortTh label="Town" k="town" sort={sort} onSort={toggle} className={th} />
                 <SortTh label="County" k="county" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Visits" k="visits" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Last Attended" k="lastAttended" sort={sort} onSort={toggle} firstDir="desc" className={th} />
                 <SortTh label="Added" k="createdAt" sort={sort} onSort={toggle} firstDir="desc" className={th} />
                 <th className={th}></th>
               </tr>
@@ -182,6 +198,10 @@ export default function Sites() {
                   <td className="py-2.5 pr-4 text-slate-600">{s.siteType}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.town || '-'}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.county || '-'}</td>
+                  <td className="py-2.5 pr-4 text-slate-600">{visitStats[s._id]?.visits || 0}</td>
+                  <td className="py-2.5 pr-4 text-slate-600">
+                    {visitStats[s._id]?.last ? formatDate(visitStats[s._id].last) : '-'}
+                  </td>
                   <td className="py-2.5 pr-4 text-slate-600">{formatDate(s.createdAt)}</td>
                   <td className="py-2.5 pr-4 text-right whitespace-nowrap">
                     <button onClick={() => openEdit(s)} className="text-slate-400 hover:text-brand-600 mr-3">
