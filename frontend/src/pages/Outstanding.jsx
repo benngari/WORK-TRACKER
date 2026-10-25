@@ -3,13 +3,22 @@ import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Download } from 'lucide-react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
+
+const time = (d) => (d ? new Date(d).getTime() : null);
 
 export default function Outstanding() {
   const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // No default column: starts in the server order (overdue first, biggest first)
+  const { sorted, sort, toggle } = useSort(rows, null, 'desc', {
+    lastAttendance: (r) => time(r.lastAttendance),
+    paymentDueDate: (r) => time(r.paymentDueDate),
+  });
 
   useEffect(() => {
     api.get('/reports/outstanding').then((res) => setRows(res.data)).finally(() => setLoading(false));
@@ -21,7 +30,7 @@ export default function Outstanding() {
 
   const handleExportCSV = () => {
     const headers = ['Client', 'Site', 'Job Card', 'Expected', 'Paid', 'Outstanding', 'Last Attendance', 'Payment Due Date', 'Days Outstanding', 'Overdue', 'Status'];
-    const csvRows = rows.map((r) => [
+    const csvRows = sorted.map((r) => [
       r.client || '',
       r.site || '',
       r.jobCardRef || '',
@@ -36,6 +45,8 @@ export default function Outstanding() {
     ]);
     downloadCSV(`outstanding-payments-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
   };
+
+  const th = 'py-2.5 px-4';
 
   return (
     <div className="space-y-4">
@@ -64,25 +75,25 @@ export default function Outstanding() {
       {loading ? (
         <div className="text-sm text-slate-400">Loading...</div>
       ) : rows.length === 0 ? (
-        <div className="card text-center py-10 text-slate-400">Nothing outstanding — all caught up.</div>
+        <div className="card text-center py-10 text-slate-400">Nothing outstanding - all caught up.</div>
       ) : (
         <div className="card p-0 overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-2.5 px-4">Client</th>
-                <th className="py-2.5 px-4">Site</th>
-                <th className="py-2.5 px-4">Job</th>
-                <th className="py-2.5 px-4">Expected</th>
-                <th className="py-2.5 px-4">Paid</th>
-                <th className="py-2.5 px-4">Outstanding</th>
-                <th className="py-2.5 px-4">Last Attendance</th>
-                <th className="py-2.5 px-4">Due Date</th>
-                <th className="py-2.5 px-4">Status</th>
+                <SortTh label="Client" k="client" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Site" k="site" sort={sort} onSort={toggle} className={th} />
+                <th className={th}>Job</th>
+                <SortTh label="Expected" k="expected" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Paid" k="paid" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Outstanding" k="outstanding" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Last Attendance" k="lastAttendance" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Due Date" k="paymentDueDate" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Status" k="status" sort={sort} onSort={toggle} className={th} />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {sorted.map((r) => (
                 <tr
                   key={r.jobId}
                   className={`border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer ${
@@ -99,7 +110,7 @@ export default function Outstanding() {
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(r.lastAttendance)}</td>
                   <td className="py-2.5 px-4">
                     {r.isOverdue ? (
-                      <span className="text-red-600 font-medium">{formatDate(r.paymentDueDate)} · Overdue</span>
+                      <span className="text-red-600 font-medium">{formatDate(r.paymentDueDate)} - Overdue</span>
                     ) : (
                       <span className="text-slate-600">{formatDate(r.paymentDueDate)}</span>
                     )}

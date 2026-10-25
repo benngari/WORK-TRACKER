@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { Plus, Trash2, MapPin, Pencil } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
-import { siteLabel } from '../utils/format.js';
+import { SortTh, useSort } from '../components/SortHeader.jsx';
+import { siteLabel, formatDate } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
 const siteTypes = ['Bank', 'Office', 'Shop', 'Warehouse', 'Institution', 'Customer Premises', 'Other'];
@@ -40,6 +41,13 @@ export default function Sites() {
   };
 
   useEffect(load, []);
+
+  const filtered = filterClient ? sites.filter((s) => s.client?._id === filterClient) : sites;
+  const { sorted, sort, toggle } = useSort(filtered, 'site', 'asc', {
+    site: (s) => siteLabel(s),
+    client: (s) => s.client?.name,
+    createdAt: (s) => (s.createdAt ? new Date(s.createdAt).getTime() : null),
+  });
 
   const openAdd = () => {
     setEditingId(null);
@@ -129,7 +137,7 @@ export default function Sites() {
     }
   };
 
-  const filtered = filterClient ? sites.filter((s) => s.client?._id === filterClient) : sites;
+  const th = 'py-2 pr-4';
 
   return (
     <div className="space-y-4">
@@ -157,22 +165,24 @@ export default function Sites() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-2 pr-4">Site</th>
-                <th className="py-2 pr-4">Client</th>
-                <th className="py-2 pr-4">Type</th>
-                <th className="py-2 pr-4">Town</th>
-                <th className="py-2 pr-4">County</th>
-                <th className="py-2 pr-4"></th>
+                <SortTh label="Site" k="site" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Client" k="client" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Type" k="siteType" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Town" k="town" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="County" k="county" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Added" k="createdAt" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <th className={th}></th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((s) => (
+              {sorted.map((s) => (
                 <tr key={s._id} className="border-b border-slate-50 last:border-0">
                   <td className="py-2.5 pr-4 font-medium text-ink-900">{siteLabel(s)}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.client?.name}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.siteType}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.town || '-'}</td>
                   <td className="py-2.5 pr-4 text-slate-600">{s.county || '-'}</td>
+                  <td className="py-2.5 pr-4 text-slate-600">{formatDate(s.createdAt)}</td>
                   <td className="py-2.5 pr-4 text-right whitespace-nowrap">
                     <button onClick={() => openEdit(s)} className="text-slate-400 hover:text-brand-600 mr-3">
                       <Pencil size={15} />

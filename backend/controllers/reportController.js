@@ -1,4 +1,8 @@
 const Job = require('../models/Job');
+const Attendance = require('../models/Attendance');
+const PaymentAllocation = require('../models/PaymentAllocation');
+const Payment = require('../models/Payment');
+const Expense = require('../models/Expense');
 const { batchComputeFinancials } = require('./jobController');
 
 exports.ledger = async (req, res) => {
@@ -103,5 +107,108 @@ exports.overdueSummary = async (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to build overdue summary', error: err.message });
+  }
+};
+
+function getPeriodRange(period) {
+  const now = new Date();
+  if (period === 'month') {
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1),
+      to: new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999),
+    };
+  }
+  if (period === 'year') {
+    return {
+      from: new Date(now.getFullYear(), 0, 1),
+      to: new Date(now.getFullYear(), 11, 31, 23, 59, 59, 999),
+    };
+  }
+  return null;
+}
+
+// Profit per client = job payments received minus net visit fares (fares you
+// spent minus fares you were reimbursed). General expenses (tools, airtime...)
+// are not tied to a client, so they are reported once in the totals.
+exports.clientProfit = async (req, res) => {
+  try {
+    const owner = req.user.id;
+    const period = ['month', 'year'].includes(req.query.period) ? req.query.period : 'all';
+    const range = getPeriodRange(period);
+    const inRange = (d) => !range || (d >= range.from && d <= range.to);
+
+    const jobs = await Job.find({ owner, deletedAt: null }).populate('client', 'name').lean();
+    const jobIds = jobs.map((j) => j._id);
+
+    const [attendance, allocations, payments, expenses] = await Promise.all([
+      Attendance.find({ job: { $in: jobIds }, owner }).lean(),
+      PaymentAllocation.find({ job: { $in: jobIds }, owner }).lean(),
+      Payment.find({ owner }).select('receivedDate').lean(),
+      Expense.find({ owner }).lean(),
+    ]);
+
+    const rowsByClient = {};
+    const jobRow = {};
+    for (const j of jobs) {
+      const id = String(j.client?._id || 'unknown');
+      rowsByClient[id] = rowsByClient[id] || {
+        clientId: id,
+        client: j.client?.name || 'Unknown',
+        callouts: 0,
+        expected: 0,
+        paid: 0,
+        fareSpent: 0,
+        fareReceived: 0,
+      };
+      jobRow[String(j._id)] = rowsByClient[id];
+    }
+
+    for (const a of attendance) {
+      if (!inRange(a.date)) continue;
+      const row = jobRow[String(a.job)];
+      if (!row) continue;
+      row.callouts += 1;
+      row.expected += a.rate;
+      row.fareSpent += a.fare || 0;
+    }
+
+    const paymentDate = {};
+    for (const p of payments) paymentDate[String(p._id)] = p.receivedDate;
+
+    for (const al of allocations) {
+      const d = paymentDate[String(al.payment)];
+      if (!d || !inRange(d)) continue;
+      const row = jobRow[String(al.job)];
+      if (!row) continue;
+      if (al.allocationType === 'Fare') row.fareReceived += al.amount;
+      else row.paid += al.amount;
+    }
+
+    const rows = Object.values(rowsByClient)
+      .map((r) => {
+        const netFares = r.fareSpent - r.fareReceived;
+        const profit = r.paid - netFares;
+        return {
+          ...r,
+          netFares,
+          profit,
+          margin: r.paid > 0 ? (profit / r.paid) * 100 : null,
+          outstanding: Math.max(0, r.expected - r.paid),
+        };
+      })
+      .filter((r) => r.callouts > 0 || r.paid > 0 || r.fareSpent > 0 || r.outstanding > 0);
+
+    const paid = rows.reduce((s, r) => s + r.paid, 0);
+    const netFares = rows.reduce((s, r) => s + r.netFares, 0);
+    const profit = rows.reduce((s, r) => s + r.profit, 0);
+    const generalExpenses = expenses.filter((e) => inRange(new Date(e.date))).reduce((s, e) => s + e.amount, 0);
+
+    res.json({
+      period,
+      rows,
+      totals: { paid, netFares, profit, generalExpenses, netIncome: profit - generalExpenses },
+    });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to build client profit report', error: err.message });
   }
 };

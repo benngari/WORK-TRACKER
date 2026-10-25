@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate, siteLabel } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
@@ -49,6 +50,12 @@ export default function Jobs() {
   const [quickSiteOpen, setQuickSiteOpen] = useState(false);
   const [quickSiteForm, setQuickSiteForm] = useState(emptyQuickSite);
   const [quickSiteSaving, setQuickSiteSaving] = useState(false);
+
+  const { sorted, sort, toggle } = useSort(jobs, 'date', 'desc', {
+    date: (j) => (j.date ? new Date(j.date).getTime() : null),
+    client: (j) => j.client?.name,
+    site: (j) => siteLabel(j.site),
+  });
 
   const load = () => {
     setLoading(true);
@@ -135,6 +142,8 @@ export default function Jobs() {
     }
   };
 
+  const th = 'py-3 px-4';
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -168,20 +177,20 @@ export default function Jobs() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-3 px-4">Date</th>
-                <th className="py-3 px-4">Client</th>
-                <th className="py-3 px-4">Site</th>
-                <th className="py-3 px-4">Job Card</th>
-                <th className="py-3 px-4">Callouts</th>
-                <th className="py-3 px-4">Expected</th>
-                <th className="py-3 px-4">Paid</th>
-                <th className="py-3 px-4">Balance</th>
-                <th className="py-3 px-4">Status</th>
-                <th className="py-3 px-4"></th>
+                <SortTh label="Date" k="date" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Client" k="client" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Site" k="site" sort={sort} onSort={toggle} className={th} />
+                <th className={th}>Job Card</th>
+                <SortTh label="Callouts" k="attendanceCount" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Expected" k="expected" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Paid" k="paid" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Balance" k="outstanding" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Status" k="paymentStatus" sort={sort} onSort={toggle} className={th} />
+                <th className={th}></th>
               </tr>
             </thead>
             <tbody>
-              {jobs.map((j) => (
+              {sorted.map((j) => (
                 <tr
                   key={j._id}
                   className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
@@ -305,7 +314,6 @@ export default function Jobs() {
         </form>
       </Modal>
 
-      {/* Inline quick-add: create a client without leaving the New Job flow */}
       <Modal open={quickClientOpen} onClose={() => setQuickClientOpen(false)} title="Quick Add Client">
         <form onSubmit={handleQuickClientSubmit} className="space-y-3">
           <div>
@@ -329,7 +337,6 @@ export default function Jobs() {
         </form>
       </Modal>
 
-      {/* Inline quick-add: create a site without leaving the New Job flow */}
       <Modal open={quickSiteOpen} onClose={() => setQuickSiteOpen(false)} title="Quick Add Site">
         <form onSubmit={handleQuickSiteSubmit} className="space-y-3">
           <div>
@@ -420,7 +427,7 @@ function RepeatJobModal({ job, onClose, onDone }) {
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
         <div className="text-sm text-slate-500">
-          Creates a new job for <span className="font-medium text-ink-800">{job.client?.name} — {siteLabel(job.site)}</span> with the same rate ({formatKES(job.rate)}) and job details.
+          Creates a new job for <span className="font-medium text-ink-800">{job.client?.name} - {siteLabel(job.site)}</span> with the same rate ({formatKES(job.rate)}) and job details.
         </div>
         <div>
           <label className="label">Date of Visit</label>

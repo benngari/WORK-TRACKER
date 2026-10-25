@@ -3,8 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Download, Printer } from 'lucide-react';
 import api from '../api/axios';
 import StatusBadge from '../components/StatusBadge.jsx';
+import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
+
+const time = (d) => (d ? new Date(d).getTime() : null);
 
 export default function PaymentLedger() {
   const navigate = useNavigate();
@@ -12,6 +15,11 @@ export default function PaymentLedger() {
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({ client: '', status: '', from: '', to: '' });
+
+  const { sorted, sort, toggle } = useSort(rows, 'jobDate', 'desc', {
+    jobDate: (r) => time(r.jobDate),
+    paymentDueDate: (r) => time(r.paymentDueDate),
+  });
 
   const load = () => {
     setLoading(true);
@@ -31,7 +39,7 @@ export default function PaymentLedger() {
 
   const handleExportCSV = () => {
     const headers = ['Job Date', 'Client', 'Site', 'Job Card', 'Callouts', 'Expected', 'Paid', 'Balance', 'Payment Due Date', 'Status'];
-    const csvRows = rows.map((r) => [
+    const csvRows = sorted.map((r) => [
       formatDate(r.jobDate),
       r.client || '',
       r.site || '',
@@ -45,6 +53,8 @@ export default function PaymentLedger() {
     ]);
     downloadCSV(`payment-ledger-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
   };
+
+  const th = 'py-2.5 px-4';
 
   return (
     <div className="space-y-4">
@@ -85,20 +95,20 @@ export default function PaymentLedger() {
           <table className="w-full text-sm">
             <thead>
               <tr className="text-left text-xs text-slate-400 uppercase border-b border-slate-100">
-                <th className="py-2.5 px-4">Job Date</th>
-                <th className="py-2.5 px-4">Client</th>
-                <th className="py-2.5 px-4">Site</th>
-                <th className="py-2.5 px-4">Job Card</th>
-                <th className="py-2.5 px-4">Callouts</th>
-                <th className="py-2.5 px-4">Expected</th>
-                <th className="py-2.5 px-4">Paid</th>
-                <th className="py-2.5 px-4">Balance</th>
-                <th className="py-2.5 px-4">Due Date</th>
-                <th className="py-2.5 px-4">Status</th>
+                <SortTh label="Job Date" k="jobDate" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Client" k="client" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Site" k="site" sort={sort} onSort={toggle} className={th} />
+                <th className={th}>Job Card</th>
+                <SortTh label="Callouts" k="callouts" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Expected" k="expected" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Paid" k="paid" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Balance" k="balance" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Due Date" k="paymentDueDate" sort={sort} onSort={toggle} className={th} />
+                <SortTh label="Status" k="status" sort={sort} onSort={toggle} className={th} />
               </tr>
             </thead>
             <tbody>
-              {rows.map((r) => (
+              {sorted.map((r) => (
                 <tr key={r.jobId} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/jobs/${r.jobId}`)}>
                   <td className="py-2.5 px-4">{formatDate(r.jobDate)}</td>
                   <td className="py-2.5 px-4 font-medium text-ink-900">{r.client}</td>

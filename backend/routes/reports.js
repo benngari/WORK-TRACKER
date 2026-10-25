@@ -7,5 +7,6 @@ router.use(auth);
 router.get('/ledger', ctrl.ledger);
 router.get('/outstanding', ctrl.outstanding);
 router.get('/overdue-summary', ctrl.overdueSummary);
+router.get('/client-profit', ctrl.clientProfit);
 
 module.exports = router;
