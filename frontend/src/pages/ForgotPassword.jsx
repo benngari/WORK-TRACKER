@@ -36,8 +36,8 @@ export default function ForgotPassword() {
 
         {sent ? (
           <div className="card text-sm text-slate-600">
-            If an account with that email exists, we've sent a password reset link to it.
-            Check your inbox (and spam folder) â€” the link expires in 1 hour.
+            If an account with that email exists, we have sent a password reset link to it.
+            Check your inbox (and spam folder). The link expires in 1 hour.
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="card space-y-4">

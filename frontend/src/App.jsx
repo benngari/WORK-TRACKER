@@ -14,6 +14,8 @@ import JobDetail from './pages/JobDetail.jsx';
 import PaymentLedger from './pages/PaymentLedger.jsx';
 import MpesaPayments from './pages/MpesaPayments.jsx';
 import Outstanding from './pages/Outstanding.jsx';
+import Expenses from './pages/Expenses.jsx';
+import ClientStatement from './pages/ClientStatement.jsx';
 import Documents from './pages/Documents.jsx';
 import CalendarPage from './pages/Calendar.jsx';
 import Reports from './pages/Reports.jsx';
@@ -53,6 +55,8 @@ export default function App() {
         <Route path="ledger" element={<PaymentLedger />} />
         <Route path="mpesa" element={<MpesaPayments />} />
         <Route path="outstanding" element={<Outstanding />} />
+        <Route path="expenses" element={<Expenses />} />
+        <Route path="statement" element={<ClientStatement />} />
         <Route path="documents" element={<Documents />} />
         <Route path="calendar" element={<CalendarPage />} />
         <Route path="reports" element={<Reports />} />

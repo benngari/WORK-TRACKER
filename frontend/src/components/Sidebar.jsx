@@ -1,21 +1,9 @@
 import { useEffect, useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import {
-  LayoutDashboard,
-  Briefcase,
-  Building2,
-  MapPin,
-  CalendarCheck,
-  Table2,
-  Smartphone,
-  AlertCircle,
-  FileText,
-  CalendarDays,
-  BarChart3,
-  Archive,
-  Trash2,
-  Settings,
-  Wallet,
+  LayoutDashboard, Briefcase, Building2, MapPin, CalendarCheck, Table2, Smartphone,
+  AlertCircle, FileText, CalendarDays, BarChart3, Archive, Trash2, Settings, Wallet,
+  Receipt, FileSpreadsheet,
 } from 'lucide-react';
 import api from '../api/axios';
 
@@ -28,6 +16,8 @@ const navItems = [
   { to: '/ledger', label: 'Payment Ledger', icon: Table2 },
   { to: '/mpesa', label: 'M-PESA Payments', icon: Smartphone },
   { to: '/outstanding', label: 'Outstanding Payments', icon: AlertCircle, badgeKey: 'outstanding' },
+  { to: '/expenses', label: 'Expenses', icon: Receipt },
+  { to: '/statement', label: 'Client Statement', icon: FileSpreadsheet },
   { to: '/documents', label: 'Job Cards / Documents', icon: FileText },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
@@ -72,9 +62,7 @@ export default function Sidebar({ open, onClose }) {
               onClick={onClose}
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-brand-600 text-white'
-                    : 'text-slate-300 hover:bg-white/5 hover:text-white'
+                  isActive ? 'bg-brand-600 text-white' : 'text-slate-300 hover:bg-white/5 hover:text-white'
                 }`
               }
             >

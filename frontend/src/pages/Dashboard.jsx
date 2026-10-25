@@ -36,6 +36,7 @@ export default function Dashboard() {
   if (error) return <div className="text-red-500 text-sm">{error}</div>;
 
   const { cards, charts } = data || { cards: {}, charts: {} };
+  const pl = periodLabels[period];
 
   return (
     <div className="space-y-6">
@@ -57,9 +58,21 @@ export default function Dashboard() {
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
-            <StatCard label={`Expected (${periodLabels[period]})`} value={formatKES(cards.totalExpected)} />
-            <StatCard label={`Paid (${periodLabels[period]})`} value={formatKES(cards.totalPaid)} accent="text-brand-600" />
-            <StatCard label={`Outstanding (${periodLabels[period]})`} value={formatKES(cards.totalOutstanding)} accent="text-amber-600" />
+            <StatCard label={`Expected (${pl})`} value={formatKES(cards.totalExpected)} />
+            <StatCard label={`Paid (${pl})`} value={formatKES(cards.totalPaid)} accent="text-brand-600" />
+            <StatCard label={`Outstanding (${pl})`} value={formatKES(cards.totalOutstanding)} accent="text-amber-600" />
+            <StatCard
+              label={`Expenses (${pl})`}
+              value={formatKES(cards.totalExpenses)}
+              accent="text-red-600"
+              sub={`${formatKES(cards.expensesLogged)} logged + ${formatKES(cards.netVisitFares)} net visit fares`}
+            />
+            <StatCard
+              label={`Net Income (${pl})`}
+              value={formatKES(cards.netIncome)}
+              accent={cards.netIncome >= 0 ? 'text-brand-600' : 'text-red-600'}
+              sub="Paid minus expenses"
+            />
             <StatCard
               label="Work Done, Not Paid"
               value={formatKES(cards.workCompletedNotPaid)}
@@ -67,14 +80,14 @@ export default function Dashboard() {
               sub="All time"
             />
             <StatCard label="Total Jobs" value={cards.totalJobs} sub="All time" />
-            <StatCard label={`Callouts (${periodLabels[period]})`} value={cards.totalCallouts} />
+            <StatCard label={`Callouts (${pl})`} value={cards.totalCallouts} />
             <StatCard label="Sites Visited" value={cards.sitesVisited} sub="All time" />
             <StatCard label="M-PESA Payments" value={cards.mpesaPayments} sub="All time" />
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="card">
-              <div className="font-semibold text-ink-900 mb-4">Monthly Expected vs Paid</div>
+              <div className="font-semibold text-ink-900 mb-4">Monthly Expected vs Paid vs Expenses</div>
               <ResponsiveContainer width="100%" height={260}>
                 <BarChart data={charts.monthly}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#eef2f6" />
@@ -84,6 +97,7 @@ export default function Dashboard() {
                   <Legend />
                   <Bar dataKey="expected" fill="#aeeacd" name="Expected" radius={[4, 4, 0, 0]} />
                   <Bar dataKey="paid" fill="#26a873" name="Paid" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="expenses" fill="#f59e0b" name="Expenses" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -99,6 +113,23 @@ export default function Dashboard() {
                   <Line type="monotone" dataKey="callouts" stroke="#18885d" strokeWidth={2} dot={{ r: 3 }} />
                 </LineChart>
               </ResponsiveContainer>
+            </div>
+
+            <div className="card">
+              <div className="font-semibold text-ink-900 mb-4">Expenses by Category ({pl})</div>
+              {(charts.expensesByCategory || []).length === 0 ? (
+                <div className="text-sm text-slate-400 py-16 text-center">No expenses logged for this period.</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={260}>
+                  <BarChart data={charts.expensesByCategory} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#eef2f6" />
+                    <XAxis type="number" tick={{ fontSize: 12 }} />
+                    <YAxis dataKey="name" type="category" width={120} tick={{ fontSize: 12 }} />
+                    <Tooltip formatter={(v) => formatKES(v)} />
+                    <Bar dataKey="total" fill="#f59e0b" name="Spent" radius={[0, 4, 4, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
             </div>
 
             <div className="card">

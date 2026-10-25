@@ -49,6 +49,7 @@ app.use('/api/dashboard', require('./routes/dashboard'));
 app.use('/api/reports', require('./routes/reports'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/backup', require('./routes/backup'));
+app.use('/api/expenses', require('./routes/expenses'));
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });

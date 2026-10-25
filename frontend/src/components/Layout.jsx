@@ -10,12 +10,15 @@ const titles = {
   '/jobs': 'Jobs',
   '/attendance': 'Attendance History',
   '/ledger': 'Payment Ledger',
-  '/mpesa': 'M-PESA Payments',
+  '/mpesa': 'Payments',
   '/outstanding': 'Outstanding Payments',
+  '/expenses': 'Expenses',
+  '/statement': 'Client Statement',
   '/documents': 'Job Cards / Documents',
   '/calendar': 'Calendar',
   '/reports': 'Reports',
   '/historical': 'Historical Records',
+  '/trash': 'Trash',
   '/settings': 'Settings',
 };
 

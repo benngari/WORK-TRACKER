@@ -55,7 +55,7 @@ export default function Login() {
               className="input"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="â€¢â€¢â€¢â€¢â€¢â€¢â€¢â€¢"
+              placeholder="Your password"
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary w-full">

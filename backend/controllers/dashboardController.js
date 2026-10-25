@@ -5,6 +5,7 @@ const Payment = require('../models/Payment');
 const MpesaTransaction = require('../models/MpesaTransaction');
 const Transport = require('../models/Transport');
 const Site = require('../models/Site');
+const Expense = require('../models/Expense');
 
 function getPeriodRange(period) {
   const now = new Date();
@@ -28,16 +29,20 @@ function getPeriodRange(period) {
   return null;
 }
 
+const monthKey = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+const sum = (arr, fn) => arr.reduce((s, x) => s + fn(x), 0);
+
 exports.summary = async (req, res) => {
   try {
     const ownerFilter = { owner: req.user.id };
     const period = ['week', 'month', 'year'].includes(req.query.period) ? req.query.period : 'all';
     const range = getPeriodRange(period);
+    const inRange = (d) => !range || (d >= range.from && d <= range.to);
 
     const jobs = await Job.find({ ...ownerFilter, deletedAt: null }).populate('client').populate('site');
     const jobIds = jobs.map((j) => j._id);
 
-    const [allAttendance, allAllocations, payments, mpesaCount, transportAgg, nairobiAgg] = await Promise.all([
+    const [allAttendance, allAllocations, payments, mpesaCount, transportAgg, nairobiAgg, allExpenses] = await Promise.all([
       Attendance.find({ job: { $in: jobIds }, owner: req.user.id }),
       PaymentAllocation.find({ job: { $in: jobIds }, owner: req.user.id }),
       Payment.find(ownerFilter),
@@ -50,6 +55,7 @@ exports.summary = async (req, res) => {
         { $match: { owner: req.user.id } },
         { $group: { _id: '$zone', total: { $sum: '$fare' }, count: { $sum: 1 } } },
       ]),
+      Expense.find(ownerFilter).lean(),
     ]);
 
     const attendanceByJob = {};
@@ -72,6 +78,7 @@ exports.summary = async (req, res) => {
     const bySite = {};
     const byBank = {};
     const byMonth = {};
+    const month = (key) => (byMonth[key] = byMonth[key] || { expected: 0, paid: 0, callouts: 0, expenses: 0 });
 
     for (const job of jobs) {
       const jobAttendance = attendanceByJob[String(job._id)] || [];
@@ -107,37 +114,49 @@ exports.summary = async (req, res) => {
       }
 
       for (const a of jobAttendance) {
-        const key = `${a.date.getFullYear()}-${String(a.date.getMonth() + 1).padStart(2, '0')}`;
-        byMonth[key] = byMonth[key] || { expected: 0, paid: 0, callouts: 0 };
-        byMonth[key].expected += job.rate;
-        byMonth[key].callouts += 1;
+        const m = month(monthKey(a.date));
+        m.expected += job.rate;
+        m.callouts += 1;
       }
     }
 
     for (const p of payments) {
-      const key = `${p.receivedDate.getFullYear()}-${String(p.receivedDate.getMonth() + 1).padStart(2, '0')}`;
-      byMonth[key] = byMonth[key] || { expected: 0, paid: 0, callouts: 0 };
-      byMonth[key].paid += p.amount;
+      month(monthKey(p.receivedDate)).paid += p.amount;
+    }
+    for (const e of allExpenses) {
+      month(monthKey(new Date(e.date))).expenses += e.amount;
     }
 
-    let periodExpected = totalExpected;
-    let periodPaid = totalPaid;
-    let periodCallouts = totalCallouts;
-    let periodOutstanding = Math.max(0, totalExpected - totalPaid);
+    const periodAttendance = allAttendance.filter((a) => inRange(a.date));
+    const paymentIdsInPeriod = new Set(payments.filter((p) => inRange(p.receivedDate)).map((p) => String(p._id)));
 
-    if (range) {
-      const periodAttendance = allAttendance.filter((a) => a.date >= range.from && a.date <= range.to);
-      periodExpected = periodAttendance.reduce((sum, a) => sum + a.rate, 0);
-      periodCallouts = periodAttendance.length;
+    const periodExpected = range ? sum(periodAttendance, (a) => a.rate) : totalExpected;
+    const periodCallouts = periodAttendance.length;
+    const periodPaid = range
+      ? sum(
+          allAllocations.filter((a) => a.allocationType !== 'Fare' && paymentIdsInPeriod.has(String(a.payment))),
+          (a) => a.amount
+        )
+      : totalPaid;
+    const periodOutstanding = Math.max(0, periodExpected - periodPaid);
 
-      const periodPayments = payments.filter((p) => p.receivedDate >= range.from && p.receivedDate <= range.to);
-      const periodPaymentIds = new Set(periodPayments.map((p) => String(p._id)));
-      periodPaid = allAllocations
-        .filter((a) => a.allocationType !== 'Fare' && periodPaymentIds.has(String(a.payment)))
-        .reduce((sum, a) => sum + a.amount, 0);
+    // Net visit fares = fares you spent on visits minus fares you were reimbursed.
+    const fareSpent = sum(periodAttendance, (a) => a.fare || 0);
+    const fareReceived = sum(
+      allAllocations.filter((a) => a.allocationType === 'Fare' && paymentIdsInPeriod.has(String(a.payment))),
+      (a) => a.amount
+    );
+    const netVisitFares = fareSpent - fareReceived;
 
-      periodOutstanding = Math.max(0, periodExpected - periodPaid);
+    const periodExpenseList = allExpenses.filter((e) => inRange(new Date(e.date)));
+    const expensesLogged = sum(periodExpenseList, (e) => e.amount);
+    const expensesByCategory = {};
+    for (const e of periodExpenseList) {
+      const c = e.category || 'Other';
+      expensesByCategory[c] = (expensesByCategory[c] || 0) + e.amount;
     }
+    const totalExpenses = expensesLogged + netVisitFares;
+    const netIncome = periodPaid - totalExpenses;
 
     const sitesVisited = await Site.countDocuments({
       _id: { $in: jobs.map((j) => j.site?._id).filter(Boolean) },
@@ -150,6 +169,10 @@ exports.summary = async (req, res) => {
         totalPaid: periodPaid,
         totalOutstanding: periodOutstanding,
         totalCallouts: periodCallouts,
+        expensesLogged,
+        netVisitFares,
+        totalExpenses,
+        netIncome,
         workCompletedNotPaid,
         totalJobs: totalCallouts,
         sitesVisited,
@@ -159,11 +182,14 @@ exports.summary = async (req, res) => {
       charts: {
         monthly: Object.entries(byMonth)
           .sort(([a], [b]) => (a > b ? 1 : -1))
-          .map(([month, v]) => ({ month, ...v })),
+          .map(([m, v]) => ({ month: m, ...v })),
         byClient: Object.entries(byClient).map(([name, v]) => ({ name, ...v })),
         bySite: Object.entries(bySite).map(([name, v]) => ({ name, ...v })),
         byBank: Object.entries(byBank).map(([name, v]) => ({ name, ...v })),
         nairobiVsOutside: nairobiAgg.map((n) => ({ zone: n._id, total: n.total, count: n.count })),
+        expensesByCategory: Object.entries(expensesByCategory)
+          .map(([name, total]) => ({ name, total }))
+          .sort((a, b) => b.total - a.total),
       },
     });
   } catch (err) {

@@ -9,15 +9,13 @@ const JobDocument = require('../models/JobDocument');
 const Transport = require('../models/Transport');
 const HistoricalRecord = require('../models/HistoricalRecord');
 const Settings = require('../models/Settings');
+const Expense = require('../models/Expense');
 
-// Exports every record belonging to the logged-in user as one JSON file.
-// This is a data-safety backup, not a way to move between accounts - it
-// includes internal IDs and references exactly as stored.
 exports.exportAll = async (req, res) => {
   try {
     const owner = req.user.id;
 
-    const [clients, sites, jobs, attendance, payments, allocations, mpesa, documents, transport, historical, settings] =
+    const [clients, sites, jobs, attendance, payments, allocations, mpesa, documents, transport, historical, settings, expenses] =
       await Promise.all([
         Client.find({ owner }).lean(),
         Site.find({ owner }).lean(),
@@ -30,12 +28,13 @@ exports.exportAll = async (req, res) => {
         Transport.find({ owner }).lean(),
         HistoricalRecord.find({ owner }).lean(),
         Settings.findOne({ owner }).lean(),
+        Expense.find({ owner }).lean(),
       ]);
 
     res.json({
       exportedAt: new Date().toISOString(),
-      version: 1,
-      data: { clients, sites, jobs, attendance, payments, allocations, mpesa, documents, transport, historical, settings },
+      version: 2,
+      data: { clients, sites, jobs, attendance, payments, allocations, mpesa, documents, transport, historical, settings, expenses },
     });
   } catch (err) {
     res.status(500).json({ message: 'Failed to export data', error: err.message });
