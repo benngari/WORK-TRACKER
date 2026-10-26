@@ -4,6 +4,7 @@ import api from '../api/axios';
 import { formatKES, siteLabel } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
+import PaymentReport from '../components/PaymentReport.jsx';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Reports() {
@@ -13,10 +14,13 @@ export default function Reports() {
       <Tabs value={view} onValueChange={setView}>
         <TabsList>
           <TabsTrigger value="profit">Client Profit</TabsTrigger>
+          <TabsTrigger value="payments">Payment Report</TabsTrigger>
           <TabsTrigger value="sites">Sites by Client</TabsTrigger>
         </TabsList>
       </Tabs>
-      {view === 'profit' ? <ClientProfit /> : <SitesByClient />}
+      {view === 'profit' && <ClientProfit />}
+      {view === 'payments' && <PaymentReport />}
+      {view === 'sites' && <SitesByClient />}
     </div>
   );
 }
