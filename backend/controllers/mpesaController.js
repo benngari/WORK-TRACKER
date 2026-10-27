@@ -1,4 +1,8 @@
 const MpesaTransaction = require('../models/MpesaTransaction');
+const Payment = require('../models/Payment');
+const PaymentAllocation = require('../models/PaymentAllocation');
+const Job = require('../models/Job');
+const { computeJobFinancials } = require('./jobController');
 const { parseMpesaMessage } = require('../utils/mpesaParser');
 
 // Step 1: paste a message, get back the parsed fields WITHOUT saving yet,
@@ -81,8 +85,26 @@ exports.update = async (req, res) => {
 
 exports.remove = async (req, res) => {
   try {
-    const tx = await MpesaTransaction.findOneAndDelete({ _id: req.params.id, owner: req.user.id });
+    const tx = await MpesaTransaction.findOne({ _id: req.params.id, owner: req.user.id });
     if (!tx) return res.status(404).json({ message: 'Not found' });
+
+    // Remove the linked payment record and any allocations to jobs, then refresh those jobs' status
+    const payments = await Payment.find({ owner: req.user.id, mpesaTransaction: tx._id });
+    for (const payment of payments) {
+      const allocations = await PaymentAllocation.find({ payment: payment._id });
+      for (const a of allocations) {
+        const job = await Job.findById(a.job);
+        await a.deleteOne();
+        if (job) {
+          const fin = await computeJobFinancials(job);
+          job.paymentStatus = fin.paymentStatus;
+          await job.save();
+        }
+      }
+      await payment.deleteOne();
+    }
+
+    await tx.deleteOne();
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ message: 'Failed to delete transaction', error: err.message });

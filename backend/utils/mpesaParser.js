@@ -95,7 +95,9 @@ function buildDate(datePart, timePart) {
     if (/PM/i.test(ampm) && hh !== 12) hh += 12;
     if (/AM/i.test(ampm) && hh === 12) hh = 0;
 
-    return new Date(fullYear, m - 1, d, hh, mm);
+    // M-PESA SMS times are East Africa Time (UTC+3). Build the instant explicitly so the
+    // server timezone (Render runs in UTC) can never shift the date.
+    return new Date(Date.UTC(fullYear, m - 1, d, hh - 3, mm));
   } catch {
     return null;
   }

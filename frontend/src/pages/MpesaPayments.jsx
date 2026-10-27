@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Plus, Smartphone, Link2, Upload, Wallet } from 'lucide-react';
+import { Plus, Smartphone, Link2, Upload, Wallet, Trash2 } from 'lucide-react';
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
-import { formatKES, formatDate, siteLabel } from '../utils/format.js';
+import { formatKES, formatDate, siteLabel, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
 export default function MpesaPayments() {
+  const toast = useToast();
   const [transactions, setTransactions] = useState([]);
   const [manualPayments, setManualPayments] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,21 @@ export default function MpesaPayments() {
   };
 
   useEffect(load, []);
+
+  const handleDelete = async (t) => {
+    const allocated = Number(t.allocatedAmount) || 0;
+    const warning = allocated > 0
+      ? ` It is allocated to jobs (${formatKES(allocated)}); those allocations will be removed too.`
+      : '';
+    if (!window.confirm(`Delete M-PESA transaction ${t.transactionCode || ''} for ${formatKES(t.amount)}?${warning}`)) return;
+    try {
+      await api.delete(`/mpesa/${t._id}`);
+      toast.success('Transaction deleted');
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete transaction');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -63,20 +79,28 @@ export default function MpesaPayments() {
               <tbody>
                 {transactions.map((t) => (
                   <tr key={t._id} className="border-b border-slate-50 last:border-0">
-                    <td className="py-2.5 px-4 font-mono text-xs text-ink-800">{t.transactionCode || '—'}</td>
+                    <td className="py-2.5 px-4 font-mono text-xs text-ink-800">{t.transactionCode || '-'}</td>
                     <td className="py-2.5 px-4 font-medium text-ink-900">{formatKES(t.amount)}</td>
-                    <td className="py-2.5 px-4 text-slate-600">{t.sender || '—'}</td>
+                    <td className="py-2.5 px-4 text-slate-600">{t.sender || '-'}</td>
                     <td className="py-2.5 px-4 text-slate-600">{formatDate(t.transactionDate)}</td>
                     <td className="py-2.5 px-4 text-amber-600 font-medium">{formatKES(t.unallocatedAmount)}</td>
                     <td className="py-2.5 px-4 text-right">
-                      {t.unallocatedAmount > 0 && (
+                      <div className="flex items-center justify-end gap-3">
+                        {t.unallocatedAmount > 0 && (
+                          <button
+                            onClick={() => { setActiveTx(t); setAllocateModalOpen(true); }}
+                            className="text-brand-600 text-xs font-medium flex items-center gap-1"
+                          >
+                            <Link2 size={13} /> Allocate
+                          </button>
+                        )}
                         <button
-                          onClick={() => { setActiveTx(t); setAllocateModalOpen(true); }}
-                          className="text-brand-600 text-xs font-medium flex items-center gap-1 ml-auto"
+                          onClick={() => handleDelete(t)}
+                          className="text-red-500 hover:text-red-700 text-xs font-medium flex items-center gap-1"
                         >
-                          <Link2 size={13} /> Allocate
+                          <Trash2 size={13} /> Delete
                         </button>
-                      )}
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -112,7 +136,7 @@ export default function MpesaPayments() {
                   <tr key={p._id} className="border-b border-slate-50 last:border-0">
                     <td className="py-2.5 px-4 text-ink-800">{p.method}</td>
                     <td className="py-2.5 px-4 font-medium text-ink-900">{formatKES(p.amount)}</td>
-                    <td className="py-2.5 px-4 text-slate-600">{p.reference || '—'}</td>
+                    <td className="py-2.5 px-4 text-slate-600">{p.reference || '-'}</td>
                     <td className="py-2.5 px-4 text-slate-600">{formatDate(p.receivedDate)}</td>
                     <td className="py-2.5 px-4 text-amber-600 font-medium">{formatKES(p.unallocated)}</td>
                   </tr>
@@ -309,7 +333,7 @@ function PasteParseModal({ open, onClose, onSaved }) {
         <div className="space-y-3">
           {duplicate && (
             <div className="text-sm bg-amber-50 text-amber-700 rounded-lg px-3 py-2">
-              A transaction with this code was already recorded — check for duplicates before saving.
+              A transaction with this code was already recorded - check for duplicates before saving.
             </div>
           )}
           {!parsed.parsedSuccessfully && (
@@ -335,8 +359,8 @@ function PasteParseModal({ open, onClose, onSaved }) {
               <input
                 type="datetime-local"
                 className="input"
-                value={parsed.transactionDate ? new Date(parsed.transactionDate).toISOString().slice(0, 16) : ''}
-                onChange={(e) => setParsed({ ...parsed, transactionDate: e.target.value })}
+                value={toNairobiInput(parsed.transactionDate)}
+                onChange={(e) => setParsed({ ...parsed, transactionDate: fromNairobiInput(e.target.value) })}
               />
             </div>
             <div>
@@ -412,7 +436,7 @@ function AllocateModal({ open, onClose, tx, onSaved }) {
             <option value="">Select job...</option>
             {jobs.map((j) => (
               <option key={j._id} value={j._id}>
-                {j.client?.name} — {siteLabel(j.site)} ({formatKES(j.outstanding)} owed)
+                {j.client?.name} - {siteLabel(j.site)} ({formatKES(j.outstanding)} owed)
               </option>
             ))}
           </select>

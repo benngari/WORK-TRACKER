@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pen
 import api from '../api/axios';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
-import { formatKES, formatDate, siteLabel, getThumbnailUrl } from '../utils/format.js';
+import { formatKES, formatDate, siteLabel, getThumbnailUrl, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
 const tabs = ['Overview', 'Attendance', 'Payments', 'Documents', 'Notes'];
@@ -63,8 +63,8 @@ export default function JobDetail() {
       <div className="card">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-lg font-bold text-ink-900">{job.client?.name} — {siteLabel(job.site)}</div>
-            <div className="text-sm text-slate-500">{job.jobCardRef || 'No job card ref'} · {job.jobType || 'Job'}</div>
+            <div className="text-lg font-bold text-ink-900">{job.client?.name} - {siteLabel(job.site)}</div>
+            <div className="text-sm text-slate-500">{job.jobCardRef || 'No job card ref'} | {job.jobType || 'Job'}</div>
           </div>
           <StatusBadge status={job.paymentStatus} />
         </div>
@@ -86,7 +86,7 @@ export default function JobDetail() {
                 (step === 'Paid' && job.paymentStatus === 'Paid')
                   ? 'bg-brand-100 text-brand-700' : 'bg-slate-100 text-slate-400'
               }`}>{step}</span>
-              {i < 4 && <span className="text-slate-300">→</span>}
+              {i < 4 && <span className="text-slate-300">{'->'}</span>}
             </div>
           ))}
         </div>
@@ -162,7 +162,7 @@ function RepeatJobModal({ job, onClose, onDone }) {
       <form onSubmit={handleSubmit} className="space-y-3">
         {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
         <div className="text-sm text-slate-500">
-          Creates a new job for <span className="font-medium text-ink-800">{job.client?.name} — {siteLabel(job.site)}</span> with the same rate ({formatKES(job.rate)}) and job details.
+          Creates a new job for <span className="font-medium text-ink-800">{job.client?.name} - {siteLabel(job.site)}</span> with the same rate ({formatKES(job.rate)}) and job details.
         </div>
         <div>
           <label className="label">Date of Visit</label>
@@ -495,7 +495,7 @@ function AttendanceTab({ job, onChange }) {
                 <td className="py-2 px-4 text-slate-500">{formatKES(a.rate)}</td>
                 <td className="py-2 px-4">
                   {a.fare > 0 ? (
-                    <span className="text-ink-800">Yes — {formatKES(a.fare)}</span>
+                    <span className="text-ink-800">Yes - {formatKES(a.fare)}</span>
                   ) : (
                     <span className="text-slate-400">No</span>
                   )}
@@ -778,6 +778,8 @@ function PaymentsTab({ job, onChange }) {
 
   return (
     <div className="space-y-4">
+      <QuickMpesaAdd job={job} onDone={() => { loadAvailablePayments(); onChange(); }} />
+
       <div className="card space-y-3">
         <div className="font-semibold text-ink-900 text-sm">Allocate an M-PESA Payment to This Job</div>
         {allocateError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{allocateError}</div>}
@@ -785,7 +787,7 @@ function PaymentsTab({ job, onChange }) {
           <div className="text-sm text-slate-400">Loading available payments...</div>
         ) : availablePayments.length === 0 ? (
           <div className="text-sm text-slate-400">
-            No unallocated M-PESA payments available. Add one from the M-PESA Payments page first.
+            No unallocated M-PESA payments available. Paste a new M-PESA message in the box above.
           </div>
         ) : (
           <div className="space-y-3">
@@ -796,7 +798,7 @@ function PaymentsTab({ job, onChange }) {
                   <option value="">Select a payment...</option>
                   {availablePayments.map((p) => (
                     <option key={p._id} value={p._id}>
-                      {p.mpesaTransaction?.transactionCode || p.method} — {formatKES(p.unallocated)} unallocated ({formatDate(p.receivedDate)})
+                      {p.mpesaTransaction?.transactionCode || p.method} - {formatKES(p.unallocated)} unallocated ({formatDate(p.receivedDate)})
                     </option>
                   ))}
                 </select>
@@ -877,8 +879,8 @@ function PaymentsTab({ job, onChange }) {
                     </span>
                   </div>
                   <div className="text-xs text-slate-400 mt-1">
-                    {a.payment?.method} · {formatDate(a.payment?.receivedDate)}
-                    {a.payment?.mpesaTransaction?.transactionCode ? ` · ${a.payment.mpesaTransaction.transactionCode}` : ''}
+                    {a.payment?.method} | {formatDate(a.payment?.receivedDate)}
+                    {a.payment?.mpesaTransaction?.transactionCode ? ` | ${a.payment.mpesaTransaction.transactionCode}` : ''}
                   </div>
                   {editingId === a._id && (
                     <div className="flex gap-2 mt-2">
@@ -1013,7 +1015,7 @@ function JobDocumentCard({ doc, onDelete }) {
         <a href={doc.url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-sm text-ink-800 hover:text-brand-600">
           <FileText size={14} className="shrink-0" /> <span className="truncate">{doc.filename}</span>
         </a>
-        <div className="text-xs text-slate-400 mt-1">{doc.category} · {formatDate(doc.createdAt)}</div>
+        <div className="text-xs text-slate-400 mt-1">{doc.category} | {formatDate(doc.createdAt)}</div>
         <button onClick={() => onDelete(doc._id)} className="text-xs text-red-500 mt-2">Delete</button>
       </div>
     </div>
@@ -1042,6 +1044,208 @@ function NotesTab({ job, onChange }) {
     <div className="card space-y-3">
       <textarea className="input" rows={6} value={notes} onChange={(e) => setNotes(e.target.value)} />
       <button onClick={handleSave} disabled={saving} className="btn-primary">{saving ? 'Saving...' : 'Save Notes'}</button>
+    </div>
+  );
+}
+
+function QuickMpesaAdd({ job, onDone }) {
+  const toast = useToast();
+  const [open, setOpen] = useState(false);
+  const [message, setMessage] = useState('');
+  const [parsed, setParsed] = useState(null);
+  const [duplicate, setDuplicate] = useState(null);
+  const [type, setType] = useState('Payment');
+  const [allocAmount, setAllocAmount] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const reset = () => {
+    setMessage('');
+    setParsed(null);
+    setDuplicate(null);
+    setType('Payment');
+    setAllocAmount(0);
+    setError('');
+  };
+
+  const suggestAmount = (amount, t) => {
+    const total = Number(amount) || 0;
+    if (t === 'Payment' && job.outstanding > 0) return Math.min(total, job.outstanding);
+    return total;
+  };
+
+  const handleParse = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      const { data } = await api.post('/mpesa/parse', { message });
+      setParsed(data.parsed);
+      setDuplicate(data.duplicate);
+      setAllocAmount(suggestAmount(data.parsed.amount, type));
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to read message');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const chooseType = (t) => {
+    setType(t);
+    if (parsed) setAllocAmount(suggestAmount(parsed.amount, t));
+  };
+
+  const handleSave = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      let paymentId;
+      if (duplicate) {
+        // Already saved before: reuse its payment record instead of creating a duplicate
+        const { data: payments } = await api.get('/payments');
+        const existing = payments.find((p) => p.mpesaTransaction && p.mpesaTransaction._id === duplicate.id);
+        if (!existing) throw new Error('This code exists but has no payment record. Check the M-PESA Payments page.');
+        paymentId = existing._id;
+      } else {
+        const { data: tx } = await api.post('/mpesa', {
+          transactionCode: parsed.transactionCode,
+          amount: parsed.amount,
+          sender: parsed.sender,
+          transactionDate: parsed.transactionDate,
+          mpesaBalance: parsed.mpesaBalance,
+          originalMessage: parsed.originalMessage,
+          parsedSuccessfully: parsed.parsedSuccessfully,
+        });
+        const { data: payment } = await api.post('/payments', {
+          method: 'M-PESA',
+          mpesaTransaction: tx._id,
+          amount: tx.amount,
+          receivedDate: tx.transactionDate || new Date(),
+        });
+        paymentId = payment._id;
+      }
+      await api.post(`/payments/${paymentId}/allocate`, {
+        jobId: job._id,
+        amount: Number(allocAmount),
+        allocationType: type,
+      });
+      toast.success('M-PESA payment added and allocated');
+      reset();
+      setOpen(false);
+      onDone();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to save');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!open) {
+    return (
+      <button onClick={() => setOpen(true)} className="btn-secondary w-full flex items-center justify-center gap-1.5">
+        <Plus size={16} /> Paste New M-PESA Message
+      </button>
+    );
+  }
+
+  const toggleClass = (active) =>
+    `flex-1 py-2 rounded-lg text-sm font-medium border ${
+      active ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'
+    }`;
+
+  return (
+    <div className="card space-y-3">
+      <div className="flex justify-between items-center">
+        <div className="font-semibold text-ink-900 text-sm">Paste New M-PESA Message</div>
+        <button onClick={() => { reset(); setOpen(false); }} className="text-slate-400 hover:text-slate-600">
+          <X size={18} />
+        </button>
+      </div>
+      {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
+
+      {!parsed && (
+        <div className="space-y-3">
+          <textarea
+            className="input font-mono text-xs"
+            rows={5}
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            placeholder="Paste the M-PESA confirmation message here"
+          />
+          <button onClick={handleParse} disabled={busy || !message.trim()} className="btn-primary w-full">
+            {busy ? 'Reading...' : 'Read Message'}
+          </button>
+        </div>
+      )}
+
+      {parsed && (
+        <div className="space-y-3">
+          {duplicate && (
+            <div className="text-sm bg-amber-50 text-amber-700 rounded-lg px-3 py-2">
+              This code is already saved. It will not be added twice - the existing payment will be allocated to this job.
+            </div>
+          )}
+          {!parsed.parsedSuccessfully && !duplicate && (
+            <div className="text-sm bg-amber-50 text-amber-700 rounded-lg px-3 py-2">
+              Some fields could not be read. Please check them below.
+            </div>
+          )}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label">Code</label>
+              <input className="input" disabled={!!duplicate} value={parsed.transactionCode || ''} onChange={(e) => setParsed({ ...parsed, transactionCode: e.target.value.toUpperCase() })} />
+            </div>
+            <div>
+              <label className="label">Amount</label>
+              <input
+                type="number"
+                className="input"
+                disabled={!!duplicate}
+                value={parsed.amount || ''}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  setParsed({ ...parsed, amount: v });
+                  setAllocAmount(suggestAmount(v, type));
+                }}
+              />
+            </div>
+            <div>
+              <label className="label">Sender</label>
+              <input className="input" disabled={!!duplicate} value={parsed.sender || ''} onChange={(e) => setParsed({ ...parsed, sender: e.target.value })} />
+            </div>
+            <div>
+              <label className="label">Date / Time</label>
+              <input
+                type="datetime-local"
+                className="input"
+                disabled={!!duplicate}
+                value={toNairobiInput(parsed.transactionDate)}
+                onChange={(e) => setParsed({ ...parsed, transactionDate: fromNairobiInput(e.target.value) })}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="label">This money is for</label>
+            <div className="flex gap-2">
+              <button type="button" onClick={() => chooseType('Payment')} className={toggleClass(type === 'Payment')}>Job Payment</button>
+              <button type="button" onClick={() => chooseType('Fare')} className={toggleClass(type === 'Fare')}>Fare / Transport</button>
+            </div>
+          </div>
+          <div>
+            <label className="label">Amount to Allocate to This Job</label>
+            <input type="number" className="input" value={allocAmount} onChange={(e) => setAllocAmount(Number(e.target.value))} />
+          </div>
+          <div className="flex gap-2">
+            <button onClick={reset} className="btn-secondary flex-1">Back</button>
+            <button
+              onClick={handleSave}
+              disabled={busy || !parsed.amount || !(Number(allocAmount) > 0)}
+              className="btn-primary flex-1"
+            >
+              {busy ? 'Saving...' : 'Save and Allocate'}
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
