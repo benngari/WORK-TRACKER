@@ -431,40 +431,21 @@ function AttendanceTab({ job, onChange }) {
     }
   };
 
-  const handleDelete = (attId) => {
-    setPendingDeleteIds((prev) => new Set(prev).add(attId));
-
-    const timeoutId = setTimeout(async () => {
-      delete timersRef.current[attId];
-      try {
-        await api.delete(`/attendance/${attId}`);
-        onChange();
-      } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to delete attendance');
-        setPendingDeleteIds((prev) => {
-          const next = new Set(prev);
-          next.delete(attId);
-          return next;
-        });
-      }
-    }, UNDO_WINDOW_MS);
-    timersRef.current[attId] = timeoutId;
-
-    toast.info('Attendance record deleted', {
-      duration: UNDO_WINDOW_MS + 300,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          clearTimeout(timersRef.current[attId]);
-          delete timersRef.current[attId];
-          setPendingDeleteIds((prev) => {
-            const next = new Set(prev);
-            next.delete(attId);
-            return next;
-          });
-        },
-      },
-    });
+  const handleDelete = async (attId) => {
+    if (!confirm('Delete this attendance record? This cannot be undone.')) return;
+    setPendingDeleteIds((prev) => new Set(prev).add(attId)); // hide it right away
+    try {
+      await api.delete(`/attendance/${attId}`);
+      toast.success('Attendance record deleted');
+      onChange();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to delete attendance');
+      setPendingDeleteIds((prev) => {
+        const next = new Set(prev);
+        next.delete(attId);
+        return next;
+      });
+    }
   };
 
   const visibleAttendance = (job.attendance || []).filter((a) => !pendingDeleteIds.has(a._id));
@@ -739,41 +720,22 @@ function PaymentsTab({ job, onChange }) {
     }
   };
 
-  const removeAllocation = (allocationId) => {
-    setPendingRemoveIds((prev) => new Set(prev).add(allocationId));
-
-    const timeoutId = setTimeout(async () => {
-      delete timersRef.current[allocationId];
-      try {
-        await api.delete(`/payments/allocations/${allocationId}`);
-        loadAvailablePayments();
-        onChange();
-      } catch (err) {
-        toast.error(err.response?.data?.message || 'Failed to remove allocation');
-        setPendingRemoveIds((prev) => {
-          const next = new Set(prev);
-          next.delete(allocationId);
-          return next;
-        });
-      }
-    }, UNDO_WINDOW_MS);
-    timersRef.current[allocationId] = timeoutId;
-
-    toast.info('Payment allocation removed', {
-      duration: UNDO_WINDOW_MS + 300,
-      action: {
-        label: 'Undo',
-        onClick: () => {
-          clearTimeout(timersRef.current[allocationId]);
-          delete timersRef.current[allocationId];
-          setPendingRemoveIds((prev) => {
-            const next = new Set(prev);
-            next.delete(allocationId);
-            return next;
-          });
-        },
-      },
-    });
+  const removeAllocation = async (allocationId) => {
+    if (!confirm('Remove this payment allocation? The money goes back to the payment so you can allocate it again.')) return;
+    setPendingRemoveIds((prev) => new Set(prev).add(allocationId)); // hide it right away
+    try {
+      await api.delete(`/payments/allocations/${allocationId}`);
+      toast.success('Payment allocation removed');
+      loadAvailablePayments();
+      onChange();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to remove allocation');
+      setPendingRemoveIds((prev) => {
+        const next = new Set(prev);
+        next.delete(allocationId);
+        return next;
+      });
+    }
   };
 
   const visibleAllocations = (job.allocations || []).filter((a) => !pendingRemoveIds.has(a._id));
