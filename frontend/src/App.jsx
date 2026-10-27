@@ -23,6 +23,7 @@ import HistoricalRecords from './pages/HistoricalRecords.jsx';
 import SettingsPage from './pages/Settings.jsx';
 import AttendanceHistory from './pages/AttendanceHistory.jsx';
 import Trash from './pages/Trash.jsx';
+import AuditLog from './pages/AuditLog.jsx';
 
 function PrivateRoute({ children }) {
   const { user } = useAuth();
@@ -62,6 +63,7 @@ export default function App() {
         <Route path="reports" element={<Reports />} />
         <Route path="historical" element={<HistoricalRecords />} />
         <Route path="trash" element={<Trash />} />
+        <Route path="audit" element={<AuditLog />} />
         <Route path="settings" element={<SettingsPage />} />
       </Route>
 

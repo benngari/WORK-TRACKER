@@ -5,6 +5,7 @@ const compression = require('compression');
 const connectDB = require('./config/db');
 
 const app = express();
+app.set('trust proxy', 1);
 
 connectDB();
 
@@ -29,6 +30,7 @@ app.use(
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+app.use('/api', require('./middleware/audit'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -50,6 +52,7 @@ app.use('/api/reports', require('./routes/reports'));
 app.use('/api/search', require('./routes/search'));
 app.use('/api/backup', require('./routes/backup'));
 app.use('/api/expenses', require('./routes/expenses'));
+app.use('/api/audit', require('./routes/audit'));
 
 app.use((req, res) => {
   res.status(404).json({ message: 'Route not found' });

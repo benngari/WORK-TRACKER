@@ -19,6 +19,7 @@ const titles = {
   '/reports': 'Reports',
   '/historical': 'Historical Records',
   '/trash': 'Trash',
+  '/audit': 'Audit Log',
   '/settings': 'Settings',
 };
 
