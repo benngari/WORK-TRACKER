@@ -5,6 +5,7 @@ import api from '../api/axios';
 import { compressImage } from '../utils/compressImage.js';
 import { DetailSkeleton, RowsSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
+import QuickCashAdd from '../components/QuickCashAdd.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate, siteLabel, getThumbnailUrl, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -790,6 +791,7 @@ function PaymentsTab({ job, onChange }) {
   return (
     <div className="space-y-4">
       <QuickMpesaAdd job={job} onDone={() => { loadAvailablePayments(); onChange(); }} />
+      <QuickCashAdd job={job} onDone={() => { loadAvailablePayments(); onChange(); }} />
 
       <div className="card space-y-3">
         <div className="font-semibold text-ink-900 text-sm">Allocate an M-PESA Payment to This Job</div>
