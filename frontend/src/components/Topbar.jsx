@@ -3,6 +3,7 @@ import { Menu, Search, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import api from '../api/axios';
+import ThemeToggle from './ThemeToggle.jsx';
 
 export default function Topbar({ title, onMenuClick }) {
   const { user, logout } = useAuth();
@@ -54,6 +55,7 @@ export default function Topbar({ title, onMenuClick }) {
         </div>
 
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <div className="text-sm text-right hidden sm:block">
             <div className="font-medium text-ink-900">{user?.name}</div>
             <div className="text-xs text-slate-400">{user?.email}</div>

@@ -1,0 +1,99 @@
+/* Black "lights out" dark mode. Active when <html> has the class "dark". Screen only - printing stays light. */
+@media screen {
+  html.dark { color-scheme: dark; }
+
+  /* surfaces: pure black page, near-black cards */
+  html.dark, html.dark body { background-color: #000; color: #e5e7eb; }
+  html.dark .bg-slate-50 { background-color: #000; }
+  html.dark .bg-white,
+  html.dark .card { background-color: #0b0b0d; }
+  html.dark .card { box-shadow: none; }
+  html.dark .bg-slate-100 { background-color: #1a1a1e; }
+  html.dark .hover\:bg-slate-50:hover { background-color: #141418; }
+  html.dark .btn-secondary { background-color: #0b0b0d; color: #e5e7eb; border-color: #2a2a2e; }
+  html.dark .btn-secondary:hover { background-color: #141418; }
+
+  /* sidebar */
+  html.dark .bg-ink-900 { background-color: #000; }
+  html.dark aside { border-right: 1px solid #1c1c20; }
+
+  /* borders */
+  html.dark .border-slate-50,
+  html.dark .border-slate-100 { border-color: #1c1c20; }
+  html.dark .border-slate-200 { border-color: #2a2a2e; }
+  html.dark .border-slate-300 { border-color: #3a3a40; }
+  html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) { border-color: #1c1c20; }
+
+  /* text */
+  html.dark .text-ink-900 { color: #f3f4f6; }
+  html.dark .text-ink-800 { color: #e5e7eb; }
+  html.dark .text-slate-700 { color: #d1d5db; }
+  html.dark .text-slate-600 { color: #b4bcc8; }
+  html.dark .text-slate-500 { color: #99a2b0; }
+  html.dark .text-slate-400 { color: #7f8998; }
+  html.dark .hover\:text-slate-600:hover { color: #d1d5db; }
+  html.dark .hover\:text-ink-900:hover { color: #ffffff; }
+
+  /* coloured text */
+  html.dark .text-red-500 { color: #f87171; }
+  html.dark .text-red-600,
+  html.dark .text-red-700 { color: #fca5a5; }
+  html.dark .text-amber-500,
+  html.dark .text-amber-600,
+  html.dark .text-amber-700 { color: #fbbf24; }
+  html.dark .text-blue-600,
+  html.dark .text-blue-700 { color: #93c5fd; }
+  html.dark .text-purple-700 { color: #d8b4fe; }
+  html.dark .text-green-700 { color: #4ade80; }
+  html.dark .text-brand-600,
+  html.dark .text-brand-700 { color: #3fc98f; }
+  html.dark .hover\:text-brand-600:hover,
+  html.dark .hover\:text-brand-700:hover { color: #6ee7b7; }
+
+  /* tinted backgrounds (badges, alerts) */
+  html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.14); }
+  html.dark .bg-red-50\/50 { background-color: rgba(239, 68, 68, 0.08); }
+  html.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.14); }
+  html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.16); }
+  html.dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.16); }
+  html.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.14); }
+  html.dark .bg-brand-50 { background-color: rgba(38, 168, 115, 0.16); }
+  html.dark .bg-brand-100,
+  html.dark .hover\:bg-brand-100:hover { background-color: rgba(38, 168, 115, 0.24); }
+  html.dark .border-amber-100 { border-color: rgba(245, 158, 11, 0.3); }
+  html.dark .border-red-100 { border-color: rgba(239, 68, 68, 0.3); }
+  html.dark .border-brand-100,
+  html.dark .border-brand-200 { border-color: rgba(38, 168, 115, 0.35); }
+
+  /* form controls */
+  html.dark .input,
+  html.dark input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),
+  html.dark select,
+  html.dark textarea {
+    background-color: #0b0b0d;
+    color: #e5e7eb;
+    border-color: #2a2a2e;
+  }
+  html.dark input::placeholder,
+  html.dark textarea::placeholder { color: #6b7280; }
+  html.dark select option { background-color: #0b0b0d; color: #e5e7eb; }
+  html.dark input:disabled,
+  html.dark select:disabled,
+  html.dark textarea:disabled { background-color: #141418; color: #7f8998; }
+
+  /* scrollbars */
+  html.dark ::-webkit-scrollbar-thumb { background: #333338; }
+
+  /* charts (Dashboard) */
+  html.dark .recharts-cartesian-grid line { stroke: #26262b; }
+  html.dark .recharts-cartesian-axis-line,
+  html.dark .recharts-cartesian-axis-tick-line { stroke: #3a3a40; }
+  html.dark .recharts-text,
+  html.dark .recharts-cartesian-axis-tick-value { fill: #99a2b0; }
+  html.dark .recharts-legend-item-text { color: #b4bcc8 !important; }
+  html.dark .recharts-default-tooltip {
+    background-color: #0b0b0d !important;
+    border-color: #2a2a2e !important;
+  }
+  html.dark .recharts-tooltip-label { color: #e5e7eb !important; }
+}
