@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Smartphone, Link2, Upload, Wallet, Trash2 } from 'lucide-react';
 import api from '../api/axios';
+import { compressImage } from '../utils/compressImage.js';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate, siteLabel, toNairobiInput, fromNairobiInput } from '../utils/format.js';
@@ -36,11 +37,13 @@ export default function MpesaPayments() {
       : '';
     if (!window.confirm(`Delete M-PESA transaction ${t.transactionCode || ''} for ${formatKES(t.amount)}?${warning}`)) return;
     try {
+      setTransactions((list) => list.filter((x) => x._id !== t._id)); // disappears instantly
       await api.delete(`/mpesa/${t._id}`);
       toast.success('Transaction deleted');
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete transaction');
+      load(); // put it back if the delete failed
     }
   };
 
@@ -373,7 +376,7 @@ function PasteParseModal({ open, onClose, onSaved }) {
             <label className="label">Attach Screenshot / Proof (optional)</label>
             <label className="btn-secondary flex items-center gap-1.5 cursor-pointer w-fit">
               <Upload size={15} /> {proofFile ? proofFile.name : 'Choose file'}
-              <input type="file" className="hidden" onChange={(e) => setProofFile(e.target.files[0])} />
+              <input type="file" className="hidden" onChange={(e) => compressImage(e.target.files[0]).then(setProofFile)} />
             </label>
           </div>
           <div>

@@ -31,4 +31,5 @@ const jobSchema = new mongoose.Schema(
 
 jobSchema.index({ owner: 1, client: 1, site: 1, createdAt: -1 });
 
+jobSchema.index({ owner: 1, deletedAt: 1, createdAt: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('Job', jobSchema);

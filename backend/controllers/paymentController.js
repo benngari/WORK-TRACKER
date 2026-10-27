@@ -8,19 +8,26 @@ exports.list = async (req, res) => {
   try {
     const payments = await Payment.find({ owner: req.user.id })
       .populate('mpesaTransaction')
-      .sort({ receivedDate: -1 });
+      .sort({ receivedDate: -1 })
+      .lean();
 
-    const withAllocations = await Promise.all(
-      payments.map(async (p) => {
-        const allocations = await PaymentAllocation.find({ payment: p._id }).populate({
-          path: 'job',
-          populate: ['client', 'site'],
-        });
+    // one query for all allocations instead of one query per payment
+    const allAllocations = await PaymentAllocation.find({ payment: { $in: payments.map((p) => p._id) } })
+      .populate({ path: 'job', populate: ['client', 'site'] })
+      .lean();
+    const byPayment = {};
+    for (const a of allAllocations) {
+      const key = String(a.payment);
+      (byPayment[key] = byPayment[key] || []).push(a);
+    }
+
+    res.json(
+      payments.map((p) => {
+        const allocations = byPayment[String(p._id)] || [];
         const allocated = allocations.reduce((sum, a) => sum + a.amount, 0);
-        return { ...p.toObject(), allocations, allocated, unallocated: Math.max(0, p.amount - allocated) };
+        return { ...p, allocations, allocated, unallocated: Math.max(0, p.amount - allocated) };
       })
     );
-    res.json(withAllocations);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch payments', error: err.message });
   }

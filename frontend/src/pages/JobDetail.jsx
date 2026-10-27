@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
+import { compressImage } from '../utils/compressImage.js';
 import { DetailSkeleton, RowsSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -938,7 +939,7 @@ function DocumentsTab({ job, onChange }) {
   const [category, setCategory] = useState('Job Card');
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0];
+    const file = await compressImage(e.target.files[0]);
     if (!file) return;
     setUploading(true);
     try {

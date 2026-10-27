@@ -15,4 +15,5 @@ const historicalRecordSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+historicalRecordSchema.index({ owner: 1, date: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('HistoricalRecord', historicalRecordSchema);

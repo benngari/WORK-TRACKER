@@ -1,12 +1,12 @@
 // Small helper to avoid repeating identical CRUD boilerplate across
 // simple owner-scoped models (Client, Site, Transport, HistoricalRecord...).
-function crudFactory(Model, { populate = null, sort = { createdAt: -1 } } = {}) {
+function crudFactory(Model, { populate = null, sort = { createdAt: -1 }, lean = false } = {}) {
   return {
     list: async (req, res) => {
       try {
         let query = Model.find({ owner: req.user.id }).sort(sort);
         if (populate) query = query.populate(populate);
-        const items = await query;
+        const items = lean ? await query.lean() : await query;
         res.json(items);
       } catch (err) {
         res.status(500).json({ message: 'Failed to fetch records', error: err.message });

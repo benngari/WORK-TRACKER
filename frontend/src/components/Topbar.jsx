@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Menu, Search, LogOut } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
@@ -11,6 +11,26 @@ export default function Topbar({ title, onMenuClick }) {
   const [q, setQ] = useState('');
   const [results, setResults] = useState(null);
   const [searching, setSearching] = useState(false);
+
+  // search as you type (waits 300 ms after you stop typing)
+  useEffect(() => {
+    if (q.trim().length < 2) {
+      setResults(null);
+      return undefined;
+    }
+    const timer = setTimeout(async () => {
+      setSearching(true);
+      try {
+        const { data } = await api.get('/search', { params: { q } });
+        setResults(data);
+      } catch (e) {
+        // ignore - pressing Enter still searches
+      } finally {
+        setSearching(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [q]);
 
   const handleSearch = async (e) => {
     e.preventDefault();

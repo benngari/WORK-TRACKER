@@ -31,6 +31,29 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html}'],
+        // big PDF/export libraries are only needed when you export, so don't download them up front
+        globIgnores: ['**/jspdf*', '**/html2canvas*', '**/purify*', '**/index.es*'],
+        // When the server is slow or offline, show the last data you saw instead of waiting.
+        runtimeCaching: [
+          {
+            urlPattern: ({ url }) => /\/assets\/(jspdf|html2canvas|purify|index\.es)/.test(url.pathname),
+            handler: 'CacheFirst',
+            options: { cacheName: 'heavy-libs', expiration: { maxEntries: 10 } },
+          },
+          {
+            urlPattern: ({ url, request }) =>
+              request.method === 'GET' &&
+              url.pathname.startsWith('/api/') &&
+              !/^\/api\/(auth|audit|backup)/.test(url.pathname),
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'api-cache',
+              networkTimeoutSeconds: 6,
+              expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
+              cacheableResponse: { statuses: [200] },
+            },
+          },
+        ],
       },
     }),
   ],
@@ -41,5 +64,18 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split big libraries into their own files so they download in parallel and cache well.
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined;
+          if (/recharts|d3-|victory/.test(id)) return 'charts';
+          if (/react-router|react-dom|[\\/]react[\\/]|scheduler/.test(id)) return 'react';
+          return undefined;
+        },
+      },
+    },
   },
 });

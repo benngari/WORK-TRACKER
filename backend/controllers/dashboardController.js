@@ -39,13 +39,13 @@ exports.summary = async (req, res) => {
     const range = getPeriodRange(period);
     const inRange = (d) => !range || (d >= range.from && d <= range.to);
 
-    const jobs = await Job.find({ ...ownerFilter, deletedAt: null }).populate('client').populate('site');
+    const jobs = await Job.find({ ...ownerFilter, deletedAt: null }).populate('client').populate('site').lean();
     const jobIds = jobs.map((j) => j._id);
 
     const [allAttendance, allAllocations, payments, mpesaCount, transportAgg, nairobiAgg, allExpenses] = await Promise.all([
-      Attendance.find({ job: { $in: jobIds }, owner: req.user.id }),
-      PaymentAllocation.find({ job: { $in: jobIds }, owner: req.user.id }),
-      Payment.find(ownerFilter),
+      Attendance.find({ job: { $in: jobIds }, owner: req.user.id }).lean(),
+      PaymentAllocation.find({ job: { $in: jobIds }, owner: req.user.id }).lean(),
+      Payment.find(ownerFilter).lean(),
       MpesaTransaction.countDocuments(ownerFilter),
       Transport.aggregate([
         { $match: { owner: req.user.id } },

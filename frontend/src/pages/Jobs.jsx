@@ -43,6 +43,7 @@ export default function Jobs() {
   const [error, setError] = useState('');
   const [filters, setFilters] = useState(loadStoredFilters);
   const [repeatJob, setRepeatJob] = useState(null);
+  const [visible, setVisible] = useState(50);
 
   const [quickClientOpen, setQuickClientOpen] = useState(false);
   const [quickClientForm, setQuickClientForm] = useState(emptyQuickClient);
@@ -191,11 +192,13 @@ export default function Jobs() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((j) => (
+              {sorted.slice(0, visible).map((j) => (
                 <tr
                   key={j._id}
                   className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer"
                   onClick={() => navigate(`/jobs/${j._id}`)}
+                  onMouseEnter={() => api.get(`/jobs/${j._id}`).catch(() => {})}
+                  onTouchStart={() => api.get(`/jobs/${j._id}`).catch(() => {})}
                 >
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(j.date)}</td>
                   <td className="py-2.5 px-4 font-medium text-ink-900">{j.client?.name}</td>
@@ -222,6 +225,13 @@ export default function Jobs() {
               ))}
             </tbody>
           </table>
+        {sorted.length > visible && (
+          <div className="p-3 text-center border-t border-slate-100">
+            <button className="btn-secondary" onClick={() => setVisible(visible + 50)}>
+              Show more ({sorted.length - visible} left)
+            </button>
+          </div>
+        )}
         </div>
       )}
 

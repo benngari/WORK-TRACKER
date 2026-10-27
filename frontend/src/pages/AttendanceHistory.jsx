@@ -12,6 +12,7 @@ export default function AttendanceHistory() {
   const [search, setSearch] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [visible, setVisible] = useState(50);
 
   const load = () => {
     setLoading(true);
@@ -67,7 +68,7 @@ export default function AttendanceHistory() {
               </tr>
             </thead>
             <tbody>
-              {sorted.map((r) => (
+              {sorted.slice(0, visible).map((r) => (
                 <tr key={r._id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 cursor-pointer" onClick={() => navigate(`/jobs/${r.job?._id}`)}>
                   <td className="py-2.5 px-4">{formatDate(r.date)}</td>
                   <td className="py-2.5 px-4 font-medium text-ink-900">{r.job?.client?.name}</td>
@@ -79,6 +80,13 @@ export default function AttendanceHistory() {
               ))}
             </tbody>
           </table>
+        {sorted.length > visible && (
+          <div className="p-3 text-center border-t border-slate-100">
+            <button className="btn-secondary" onClick={() => setVisible(visible + 50)}>
+              Show more ({sorted.length - visible} left)
+            </button>
+          </div>
+        )}
           {sorted.length === 0 && <div className="text-center py-8 text-sm text-slate-400">No attendance records found.</div>}
         </div>
       )}

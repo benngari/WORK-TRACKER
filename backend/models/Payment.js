@@ -15,4 +15,5 @@ const paymentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+paymentSchema.index({ owner: 1, receivedDate: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('Payment', paymentSchema);

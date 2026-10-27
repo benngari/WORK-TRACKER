@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Upload, FileText, Trash2, File as FileIcon } from 'lucide-react';
 import api from '../api/axios';
+import { compressImage } from '../utils/compressImage.js';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 import { formatDate, getThumbnailUrl } from '../utils/format.js';
 
@@ -19,7 +20,7 @@ export default function Documents() {
   useEffect(load, []);
 
   const handleUpload = async (e) => {
-    const file = e.target.files[0];
+    const file = await compressImage(e.target.files[0]);
     if (!file) return;
     setUploading(true);
     try {

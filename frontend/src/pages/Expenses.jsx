@@ -28,6 +28,7 @@ export default function Expenses() {
   const [expenses, setExpenses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
+  const [visible, setVisible] = useState(50);
   const [category, setCategory] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -97,11 +98,13 @@ export default function Expenses() {
   const handleDelete = async (id) => {
     if (!confirm('Delete this expense?')) return;
     try {
+      setExpenses((list) => list.filter((x) => x._id !== id)); // disappears instantly
       await api.delete(`/expenses/${id}`);
       toast.success('Expense deleted');
       load();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete expense');
+      load(); // put it back if the delete failed
     }
   };
 
@@ -185,7 +188,7 @@ export default function Expenses() {
               </tr>
             </thead>
             <tbody>
-              {filtered.map((e) => (
+              {filtered.slice(0, visible).map((e) => (
                 <tr key={e._id} className="border-b border-slate-50 last:border-0">
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(e.date)}</td>
                   <td className="py-2.5 px-4 text-ink-800">{e.category}</td>
@@ -203,6 +206,13 @@ export default function Expenses() {
               ))}
             </tbody>
           </table>
+        {filtered.length > visible && (
+          <div className="p-3 text-center border-t border-slate-100">
+            <button className="btn-secondary" onClick={() => setVisible(visible + 50)}>
+              Show more ({filtered.length - visible} left)
+            </button>
+          </div>
+        )}
         </div>
       )}
 

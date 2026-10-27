@@ -8,7 +8,7 @@ exports.list = async (req, res) => {
     if (req.query.category) filter.category = req.query.category;
     if (req.query.standalone === 'true') filter.job = null;
 
-    const docs = await JobDocument.find(filter).populate('job').sort({ createdAt: -1 });
+    const docs = await JobDocument.find(filter).populate('job').sort({ createdAt: -1 }).lean();
     res.json(docs);
   } catch (err) {
     res.status(500).json({ message: 'Failed to fetch documents', error: err.message });

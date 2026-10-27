@@ -16,4 +16,5 @@ const transportSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+transportSchema.index({ owner: 1, date: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('Transport', transportSchema);

@@ -32,4 +32,5 @@ mpesaSchema.index(
   { unique: true, partialFilterExpression: { transactionCode: { $type: 'string', $ne: '' } } }
 );
 
+mpesaSchema.index({ owner: 1, transactionDate: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('MpesaTransaction', mpesaSchema);

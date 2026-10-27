@@ -12,6 +12,7 @@ exports.list = async (req, res) => {
     }
     const records = await Attendance.find(filter)
       .populate({ path: 'job', populate: ['client', 'site'] })
+      .lean() // fast read
       .sort({ date: -1 });
     res.json(records);
   } catch (err) {
@@ -68,7 +69,7 @@ exports.calendar = async (req, res) => {
       if (req.query.from) filter.date.$gte = new Date(req.query.from);
       if (req.query.to) filter.date.$lte = new Date(req.query.to);
     }
-    const records = await Attendance.find(filter).populate({
+    const records = await Attendance.find(filter).lean().populate({
       path: 'job',
       populate: ['client', 'site'],
     });

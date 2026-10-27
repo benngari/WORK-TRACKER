@@ -17,4 +17,5 @@ const attendanceSchema = new mongoose.Schema(
 
 attendanceSchema.index({ owner: 1, job: 1, date: 1 });
 
+attendanceSchema.index({ owner: 1, date: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('Attendance', attendanceSchema);

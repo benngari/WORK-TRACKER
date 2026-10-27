@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useCallback } from 'react';
-import api from '../api/axios';
+import api, { clearApiCache } from '../api/axios';
 
 const AuthContext = createContext(null);
 
@@ -53,6 +53,8 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('wt_token');
     localStorage.removeItem('wt_user');
     setUser(null);
+    clearApiCache();
+    if (window.caches) caches.delete('api-cache');
   }, []);
 
   return (
