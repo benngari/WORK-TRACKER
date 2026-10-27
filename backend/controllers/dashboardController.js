@@ -115,7 +115,7 @@ exports.summary = async (req, res) => {
 
       for (const a of jobAttendance) {
         const m = month(monthKey(a.date));
-        m.expected += job.rate;
+        m.expected += job.expectedPaymentOverride != null && jobAttendance.length ? job.expectedPaymentOverride / jobAttendance.length : job.rate;
         m.callouts += 1;
       }
     }
@@ -130,7 +130,16 @@ exports.summary = async (req, res) => {
     const periodAttendance = allAttendance.filter((a) => inRange(a.date));
     const paymentIdsInPeriod = new Set(payments.filter((p) => inRange(p.receivedDate)).map((p) => String(p._id)));
 
-    const periodExpected = range ? sum(periodAttendance, (a) => a.rate) : totalExpected;
+    // whole-job jobs: spread the agreed total evenly over the days worked
+    const jobOverride = {};
+    for (const j of jobs) if (j.expectedPaymentOverride != null) jobOverride[String(j._id)] = j.expectedPaymentOverride;
+    const periodExpected = range
+      ? sum(periodAttendance, (a) => {
+          const total = jobOverride[String(a.job)];
+          const days = (attendanceByJob[String(a.job)] || []).length;
+          return total != null && days ? total / days : a.rate;
+        })
+      : totalExpected;
     const periodCallouts = periodAttendance.length;
     const periodPaid = range
       ? sum(

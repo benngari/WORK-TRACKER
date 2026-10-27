@@ -72,7 +72,7 @@ export default function JobDetail() {
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mt-4">
           <Metric label="Callouts" value={job.attendanceCount} />
-          <Metric label="Expected" value={formatKES(job.expected)} />
+          <Metric label={job.expectedPaymentOverride != null ? 'Expected (agreed total)' : 'Expected'} value={formatKES(job.expected)} />
           <Metric label="Paid" value={formatKES(job.paid)} accent="text-brand-600" />
           <Metric label="Outstanding" value={formatKES(job.outstanding)} accent="text-amber-600" />
           <Metric label="Fare Received" value={formatKES(job.fareReceived)} accent="text-blue-600" />
@@ -208,6 +208,8 @@ function EditJobModal({ open, onClose, job, onSaved }) {
       status: job.status || 'Open',
       rate: job.rate,
       paymentDueDate: job.paymentDueDate ? job.paymentDueDate.slice(0, 10) : '',
+      payMode: job.expectedPaymentOverride != null ? 'whole' : 'day',
+      expectedPaymentOverride: job.expectedPaymentOverride ?? '',
     });
     setError('');
     Promise.all([api.get('/clients'), api.get('/sites')]).then(([c, s]) => {
@@ -225,7 +227,12 @@ function EditJobModal({ open, onClose, job, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      await api.put(`/jobs/${job._id}`, form);
+      const { payMode, ...jobFields } = form;
+      await api.put(`/jobs/${job._id}`, {
+        ...jobFields,
+        expectedPaymentOverride:
+          payMode === 'whole' && form.expectedPaymentOverride !== '' ? Number(form.expectedPaymentOverride) : null,
+      });
       toast.success('Job updated');
       onClose();
       onSaved();
@@ -294,6 +301,42 @@ function EditJobModal({ open, onClose, job, onSaved }) {
             <input type="date" className="input" value={form.paymentDueDate} onChange={(e) => setForm({ ...form, paymentDueDate: e.target.value })} />
           </div>
         </div>
+                <div>
+          <label className="label">How is this job paid?</label>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, payMode: 'day' })}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border ${form.payMode !== 'whole' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}
+            >
+              Per day (days x rate)
+            </button>
+            <button
+              type="button"
+              onClick={() => setForm({ ...form, payMode: 'whole' })}
+              className={`flex-1 py-2 rounded-lg text-sm font-medium border ${form.payMode === 'whole' ? 'bg-brand-600 text-white border-brand-600' : 'bg-white text-slate-600 border-slate-200'}`}
+            >
+              Whole job (one total)
+            </button>
+          </div>
+          {form.payMode === 'whole' && (
+            <div className="mt-3">
+              <label className="label">Agreed total for the whole job (KES)</label>
+              <input
+                type="number"
+                min="0"
+                className="input"
+                value={form.expectedPaymentOverride}
+                onChange={(e) => setForm({ ...form, expectedPaymentOverride: e.target.value })}
+                placeholder="e.g. 5000"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                By day rate this is {job.attendanceCount || 0} x {formatKES(form.rate)} = {formatKES((job.attendanceCount || 0) * form.rate)}.
+                The agreed total replaces that, even if it does not divide evenly by the days worked.
+              </p>
+            </div>
+          )}
+        </div>
         <button disabled={saving} className="btn-primary w-full">{saving ? 'Saving...' : 'Save Changes'}</button>
       </form>
     </Modal>
@@ -305,6 +348,10 @@ function OverviewTab({ job }) {
     <div className="card space-y-3 text-sm">
       <Row label="Description" value={job.description || '-'} />
       <Row label="Job Rate" value={formatKES(job.rate)} />
+      <Row
+        label="Payment basis"
+        value={job.expectedPaymentOverride != null ? `Whole job - agreed total ${formatKES(job.expectedPaymentOverride)}` : 'Per day (days x rate)'}
+      />
       <Row label="Status" value={job.status} />
       <Row label="Payment Due Date" value={formatDate(job.paymentDueDate)} />
       <Row label="Created" value={formatDate(job.createdAt)} />

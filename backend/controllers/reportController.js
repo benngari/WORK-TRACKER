@@ -147,6 +147,17 @@ exports.clientProfit = async (req, res) => {
       Expense.find({ owner }).lean(),
     ]);
 
+    // whole-job jobs: spread the agreed total evenly over the days worked
+    const dayCount = {};
+    for (const a of attendance) dayCount[String(a.job)] = (dayCount[String(a.job)] || 0) + 1;
+    const overrideOf = {};
+    for (const j of jobs) if (j.expectedPaymentOverride != null) overrideOf[String(j._id)] = j.expectedPaymentOverride;
+    const shareOf = (a) => {
+      const total = overrideOf[String(a.job)];
+      const days = dayCount[String(a.job)];
+      return total != null && days ? total / days : a.rate;
+    };
+
     const rowsByClient = {};
     const jobRow = {};
     for (const j of jobs) {
@@ -168,7 +179,7 @@ exports.clientProfit = async (req, res) => {
       const row = jobRow[String(a.job)];
       if (!row) continue;
       row.callouts += 1;
-      row.expected += a.rate;
+      row.expected += shareOf(a);
       row.fareSpent += a.fare || 0;
     }
 

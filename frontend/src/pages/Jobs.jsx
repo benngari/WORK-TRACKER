@@ -90,6 +90,7 @@ export default function Jobs() {
       const { client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes } = form;
       const { data: job } = await api.post('/jobs', {
         client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes,
+        expectedPaymentOverride: form.wholeJob && form.jobTotal !== '' && form.jobTotal != null ? Number(form.jobTotal) : null,
       });
 
       await api.post('/attendance', {
@@ -286,6 +287,33 @@ export default function Jobs() {
               <label className="label">Fare</label>
               <input type="number" className="input" value={form.fare} onChange={(e) => setForm({ ...form, fare: Number(e.target.value) })} />
             </div>
+          </div>
+
+                    <div>
+            <label className="flex items-center gap-2 text-sm text-slate-600">
+              <input
+                type="checkbox"
+                checked={!!form.wholeJob}
+                onChange={(e) => setForm({ ...form, wholeJob: e.target.checked })}
+              />
+              Paid as one total for the whole job (not per day)
+            </label>
+            {form.wholeJob && (
+              <div className="mt-2">
+                <label className="label">Agreed total for the whole job (KES)</label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  value={form.jobTotal ?? ''}
+                  onChange={(e) => setForm({ ...form, jobTotal: e.target.value })}
+                  placeholder="e.g. 5000"
+                />
+                <p className="text-xs text-slate-400 mt-1">
+                  Use this when you work several days and are paid one sum that does not divide by your day rate.
+                </p>
+              </div>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-3">
