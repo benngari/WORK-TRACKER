@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import api from '../api/axios';
+import { FormSkeleton } from '../components/Skeletons.jsx';
 import { setCurrency } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
@@ -66,7 +67,7 @@ export default function SettingsPage() {
     }
   };
 
-  if (!settings) return <div className="text-sm text-slate-400">Loading...</div>;
+  if (!settings) return <FormSkeleton />;
 
   return (
     <div className="max-w-md space-y-4">

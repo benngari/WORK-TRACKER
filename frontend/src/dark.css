@@ -9,6 +9,7 @@
   html.dark .card { background-color: #0b0b0d; }
   html.dark .card { box-shadow: none; }
   html.dark .bg-slate-100 { background-color: #1a1a1e; }
+  html.dark .bg-slate-200 { background-color: #1f1f24; }
   html.dark .hover\:bg-slate-50:hover { background-color: #141418; }
   html.dark .btn-secondary { background-color: #0b0b0d; color: #e5e7eb; border-color: #2a2a2e; }
   html.dark .btn-secondary:hover { background-color: #141418; }

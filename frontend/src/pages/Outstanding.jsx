@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertCircle, Download } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
@@ -73,7 +74,7 @@ export default function Outstanding() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : rows.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">Nothing outstanding - all caught up.</div>
       ) : (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from './Skeletons.jsx';
 import { formatKES, formatDate, siteLabel, getCurrency } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -153,7 +154,7 @@ export default function PaymentReport() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : !clientId ? (
         <div className="card text-center py-10 text-slate-400">Choose a client and a period to build the report.</div>
       ) : rows.length === 0 ? (

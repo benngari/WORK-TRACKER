@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, Printer } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
@@ -89,7 +90,7 @@ export default function PaymentLedger() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : (
         <div className="card p-0 overflow-x-auto">
           <table className="w-full text-sm">

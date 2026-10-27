@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Printer } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
@@ -95,7 +96,7 @@ export default function ClientStatement() {
       {!clientId ? (
         <div className="card text-center py-10 text-slate-400">Choose a client to see their statement.</div>
       ) : loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : (
         <div className="card">
           <div className="mb-4">

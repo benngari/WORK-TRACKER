@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Upload, FileText, Trash2, File as FileIcon } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import { formatDate, getThumbnailUrl } from '../utils/format.js';
 
 export default function Documents() {
@@ -68,7 +69,7 @@ export default function Documents() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : filtered.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">No documents uploaded yet.</div>
       ) : (

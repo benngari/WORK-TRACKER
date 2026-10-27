@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Download, Receipt } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
@@ -165,7 +166,7 @@ export default function Expenses() {
       </p>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : filtered.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">
           <Receipt className="mx-auto mb-2" />

@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 
 const ENTITIES = [
   ['', 'All areas'],
@@ -192,7 +193,7 @@ export default function AuditLog() {
       {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{error}</div>}
 
       {loading && logs.length === 0 ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton rows={8} />
       ) : logs.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">
           <ScrollText className="mx-auto mb-2" />

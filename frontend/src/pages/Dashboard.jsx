@@ -4,6 +4,7 @@ import {
   PieChart, Pie, Cell, Legend, LineChart, Line,
 } from 'recharts';
 import api from '../api/axios';
+import { DashboardSkeleton } from '../components/Skeletons.jsx';
 import StatCard from '../components/StatCard.jsx';
 import OnboardingChecklist from '../components/OnboardingChecklist.jsx';
 import { formatKES } from '../utils/format.js';
@@ -54,7 +55,7 @@ export default function Dashboard() {
       </div>
 
       {loading ? (
-        <div className="text-slate-400 text-sm">Loading dashboard...</div>
+        <DashboardSkeleton />
       ) : (
         <>
           <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">

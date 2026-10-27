@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import { formatKES, siteLabel } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
@@ -91,7 +92,7 @@ function ClientProfit() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton rows={4} />
       ) : rows.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">No client activity in this period.</div>
       ) : (
@@ -183,7 +184,7 @@ function SitesByClient() {
         </select>
       </div>
 
-      {loading && <div className="text-sm text-slate-400">Loading...</div>}
+      {loading && <TableSkeleton rows={4} />}
 
       {summary && (
         <div className="space-y-4">

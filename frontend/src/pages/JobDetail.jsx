@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
+import { DetailSkeleton, RowsSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate, siteLabel, getThumbnailUrl, toNairobiInput, fromNairobiInput } from '../utils/format.js';
@@ -38,7 +39,7 @@ export default function JobDetail() {
     }
   };
 
-  if (loading) return <div className="text-sm text-slate-400">Loading...</div>;
+  if (loading) return <DetailSkeleton />;
   if (!job) return <div className="text-sm text-red-500">Job not found.</div>;
 
   return (
@@ -784,7 +785,7 @@ function PaymentsTab({ job, onChange }) {
         <div className="font-semibold text-ink-900 text-sm">Allocate an M-PESA Payment to This Job</div>
         {allocateError && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2">{allocateError}</div>}
         {loadingPayments ? (
-          <div className="text-sm text-slate-400">Loading available payments...</div>
+          <RowsSkeleton rows={3} />
         ) : availablePayments.length === 0 ? (
           <div className="text-sm text-slate-400">
             No unallocated M-PESA payments available. Paste a new M-PESA message in the box above.

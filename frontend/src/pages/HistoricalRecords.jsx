@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Archive, Trash2, Upload } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
 
@@ -52,7 +53,7 @@ export default function HistoricalRecords() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : records.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">
           <Archive className="mx-auto mb-2" />

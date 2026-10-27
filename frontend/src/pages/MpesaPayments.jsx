@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Smartphone, Link2, Upload, Wallet, Trash2 } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate, siteLabel, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -57,7 +58,7 @@ export default function MpesaPayments() {
       <div>
         <h2 className="text-sm font-semibold text-ink-900 mb-2">M-PESA Transactions</h2>
         {loading ? (
-          <div className="text-sm text-slate-400">Loading...</div>
+          <TableSkeleton rows={4} />
         ) : transactions.length === 0 ? (
           <div className="card text-center py-10 text-slate-400">
             <Smartphone className="mx-auto mb-2" />
@@ -113,7 +114,7 @@ export default function MpesaPayments() {
       <div>
         <h2 className="text-sm font-semibold text-ink-900 mb-2">Other Payments (Cash, Bank Transfer, etc.)</h2>
         {loading ? (
-          <div className="text-sm text-slate-400">Loading...</div>
+          <TableSkeleton rows={4} />
         ) : manualPayments.length === 0 ? (
           <div className="card text-center py-10 text-slate-400">
             <Wallet className="mx-auto mb-2" />

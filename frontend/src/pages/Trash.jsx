@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Trash2, RotateCcw, AlertTriangle } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import { formatDate, siteLabel } from '../utils/format.js';
 
 export default function Trash() {
@@ -39,7 +40,7 @@ export default function Trash() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : jobs.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">
           <Trash2 className="mx-auto mb-2" />

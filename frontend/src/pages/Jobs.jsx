@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Plus, Briefcase, Copy } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
@@ -166,7 +167,7 @@ export default function Jobs() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : jobs.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">
           <Briefcase className="mx-auto mb-2" />

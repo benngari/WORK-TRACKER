@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Building2, Pencil } from 'lucide-react';
 import api from '../api/axios';
+import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
@@ -90,7 +91,7 @@ export default function Clients() {
       </div>
 
       {loading ? (
-        <div className="text-sm text-slate-400">Loading...</div>
+        <TableSkeleton />
       ) : clients.length === 0 ? (
         <div className="card text-center py-10 text-slate-400">
           <Building2 className="mx-auto mb-2" />
