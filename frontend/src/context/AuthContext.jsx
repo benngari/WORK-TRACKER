@@ -41,6 +41,15 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(() => {
+    // tell the server so the audit log can record it (fire and forget)
+    const token = localStorage.getItem('wt_token');
+    if (token) {
+      fetch(`${api.defaults.baseURL}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        keepalive: true,
+      }).catch(() => {});
+    }
     localStorage.removeItem('wt_token');
     localStorage.removeItem('wt_user');
     setUser(null);

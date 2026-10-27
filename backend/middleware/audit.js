@@ -74,6 +74,7 @@ function describe(method, segments) {
 
   if (entity === 'auth') {
     if (second === 'login') return { type: 'auth', verb: 'Logged in' };
+    if (second === 'logout') return { type: 'auth', verb: 'Logged out' };
     if (second === 'register') return { type: 'auth', verb: 'Registered an account' };
     if (second === 'forgot-password') return { type: 'auth', verb: 'Requested a password reset' };
     if (second === 'reset-password') return { type: 'auth', verb: 'Reset password' };
