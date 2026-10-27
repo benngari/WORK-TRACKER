@@ -179,7 +179,7 @@ module.exports = async function audit(req, res, next) {
     };
 
     res.on('finish', () => {
-      record().catch((err) => console.error('Audit log failed:', err.message));
+      record().catch((err) => console.error('AUDIT FAILED:', req.method, req.originalUrl, err));
     });
 
     async function record() {
@@ -194,7 +194,7 @@ module.exports = async function audit(req, res, next) {
         const u = await User.findOne({ email: req.body.email.toLowerCase() }).select('_id').lean();
         if (u) owner = u._id;
       }
-      if (!owner) return;
+      if (!owner) { console.warn('AUDIT SKIPPED (no user found):', req.method, req.originalUrl); return; }
 
       const idInPath = segments.find((s) => ID_RE.test(s)) || '';
       let doc = null;
