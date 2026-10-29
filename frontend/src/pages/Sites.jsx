@@ -11,8 +11,15 @@ const siteTypes = ['Bank', 'Office', 'Shop', 'Warehouse', 'Institution', 'Custom
 
 const emptyForm = {
   client: '', siteType: 'Bank', bankName: '', branch: '', branchCode: '',
-  siteName: '', location: '', town: '', county: '', isNairobi: false, notes: '',
+  siteName: '', location: '', town: '', county: '', isNairobi: false, notes: '', coords: '',
 };
+
+// "-1.2921, 36.8219" (copied from Google Maps) -> latitude and longitude numbers
+function withCoords(form) {
+  const { coords, ...rest } = form;
+  const m = String(coords || '').match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
+  return { ...rest, latitude: m ? Number(m[1]) : null, longitude: m ? Number(m[2]) : null };
+}
 
 function normalize(str) {
   return (str || '').trim().toLowerCase().replace(/\s+/g, ' ');
@@ -86,6 +93,7 @@ export default function Sites() {
       county: site.county || '',
       isNairobi: site.isNairobi || false,
       notes: site.notes || '',
+      coords: site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '',
     });
     setError('');
     setDuplicateWarning(null);
@@ -123,10 +131,10 @@ export default function Sites() {
     setError('');
     try {
       if (editingId) {
-        await api.put(`/sites/${editingId}`, form);
+        await api.put(`/sites/${editingId}`, withCoords(form));
         toast.success('Site updated');
       } else {
-        await api.post('/sites', form);
+        await api.post('/sites', withCoords(form));
         toast.success('Site added');
       }
       setModalOpen(false);
@@ -313,6 +321,19 @@ export default function Sites() {
           <div>
             <label className="label">Location / Directions</label>
             <input className="input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
+          </div>
+                    <div>
+            <label className="label">Map coordinates (optional)</label>
+            <input
+              className="input"
+              value={form.coords || ''}
+              onChange={(e) => setForm({ ...form, coords: e.target.value })}
+              placeholder="e.g. -1.2921, 36.8219"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              For an exact pin on the Dashboard map: in Google Maps, press and hold the spot, then copy the two numbers shown and paste them here.
+              Without this, the site is placed by its town or county.
+            </p>
           </div>
           <label className="flex items-center gap-2 text-sm text-slate-600">
             <input type="checkbox" checked={form.isNairobi} onChange={(e) => setForm({ ...form, isNairobi: e.target.checked })} />

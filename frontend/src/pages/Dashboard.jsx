@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell, Legend, LineChart, Line,
@@ -7,8 +7,12 @@ import api from '../api/axios';
 import { DashboardSkeleton } from '../components/Skeletons.jsx';
 import StatCard from '../components/StatCard.jsx';
 import OnboardingChecklist from '../components/OnboardingChecklist.jsx';
+import { MapPin } from 'lucide-react';
 import { formatKES } from '../utils/format.js';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+// the map (and its library) only downloads when you switch it on
+const SitesMap = lazy(() => import('../components/SitesMap.jsx'));
 
 const COLORS = ['#26a873', '#7ad9ae', '#48c28c', '#146d4c', '#aeeacd', '#18885d'];
 
@@ -24,6 +28,7 @@ export default function Dashboard() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [showMap, setShowMap] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -52,7 +57,16 @@ export default function Dashboard() {
             <TabsTrigger value="week">This Week</TabsTrigger>
           </TabsList>
         </Tabs>
+        <button onClick={() => setShowMap((v) => !v)} className="btn-secondary flex items-center gap-1.5">
+          <MapPin size={16} /> {showMap ? 'Hide Sites Map' : 'Show Sites Map'}
+        </button>
       </div>
+
+      {showMap && (
+        <Suspense fallback={<div className="card text-sm text-slate-400">Loading map...</div>}>
+          <SitesMap />
+        </Suspense>
+      )}
 
       {loading ? (
         <DashboardSkeleton />

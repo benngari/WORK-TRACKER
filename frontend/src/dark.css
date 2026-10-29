@@ -84,6 +84,14 @@
 
   /* scrollbars */
   html.dark ::-webkit-scrollbar-thumb { background: #333338; }
+  /* sites map: darken the map tiles and controls */
+  html.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
+  html.dark .leaflet-container { background: #0b0b0d; }
+  html.dark .leaflet-popup-content-wrapper,
+  html.dark .leaflet-popup-tip { background: #0b0b0d; color: #e5e7eb; }
+  html.dark .leaflet-control-zoom a { background: #0b0b0d; color: #e5e7eb; border-color: #2a2a2e; }
+  html.dark .leaflet-control-attribution { background: rgba(0, 0, 0, 0.6); color: #99a2b0; }
+  html.dark .leaflet-control-attribution a { color: #6ee7b7; }
 
   /* charts (Dashboard) */
   html.dark .recharts-cartesian-grid line { stroke: #26262b; }

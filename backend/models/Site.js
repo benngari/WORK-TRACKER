@@ -19,6 +19,9 @@ const siteSchema = new mongoose.Schema(
     town: { type: String, trim: true },
     county: { type: String, trim: true },
     isNairobi: { type: Boolean, default: false },
+    // optional exact position for the Dashboard map
+    latitude: { type: Number, default: null },
+    longitude: { type: Number, default: null },
     notes: { type: String, trim: true },
   },
   { timestamps: true }
