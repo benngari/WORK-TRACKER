@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Smartphone, Link2, Upload, Wallet, Trash2 } from 'lucide-react';
 import api from '../api/axios';
+import { useSearchParams } from 'react-router-dom';
 import { compressImage } from '../utils/compressImage.js';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
@@ -16,6 +17,14 @@ export default function MpesaPayments() {
   const [manualModalOpen, setManualModalOpen] = useState(false);
   const [allocateModalOpen, setAllocateModalOpen] = useState(false);
   const [activeTx, setActiveTx] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // opened from a home-screen shortcut (?new=1)
+  useEffect(() => {
+    if (searchParams.get('new')) {
+      setPasteModalOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   const load = () => {
     setLoading(true);

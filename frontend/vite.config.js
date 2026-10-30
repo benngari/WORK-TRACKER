@@ -16,6 +16,29 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
+        shortcuts: [
+          {
+            name: 'Record Attendance',
+            short_name: 'Attendance',
+            description: 'Record a day worked',
+            url: '/attendance?new=1',
+            icons: [{ src: 'https://res.cloudinary.com/dd4b2ssdy/image/upload/w_192,h_192,c_fill,f_png/v1787773487/men_on_carrmels_wo6vmf.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Add Expense',
+            short_name: 'Expense',
+            description: 'Add an expense',
+            url: '/expenses?new=1',
+            icons: [{ src: 'https://res.cloudinary.com/dd4b2ssdy/image/upload/w_192,h_192,c_fill,f_png/v1787773487/men_on_carrmels_wo6vmf.png', sizes: '192x192', type: 'image/png' }],
+          },
+          {
+            name: 'Paste M-PESA',
+            short_name: 'M-PESA',
+            description: 'Paste an M-PESA message',
+            url: '/mpesa?new=1',
+            icons: [{ src: 'https://res.cloudinary.com/dd4b2ssdy/image/upload/w_192,h_192,c_fill,f_png/v1787773487/men_on_carrmels_wo6vmf.png', sizes: '192x192', type: 'image/png' }],
+          },
+        ],
         icons: [
           {
             src: 'https://res.cloudinary.com/dd4b2ssdy/image/upload/w_192,h_192,c_fill,f_png/v1787773487/men_on_carrmels_wo6vmf.png',

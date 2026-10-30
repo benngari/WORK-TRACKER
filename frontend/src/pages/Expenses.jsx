@@ -1,6 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Download, Receipt } from 'lucide-react';
 import api from '../api/axios';
+import { useSearchParams } from 'react-router-dom';
+import { postOrQueue } from '../utils/offlineQueue.js';
+import { todayNairobi } from '../utils/dates.js';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate } from '../utils/format.js';
@@ -12,7 +15,7 @@ const CATEGORIES = [
   'Meals', 'Rent & Utilities', 'Licences & Fees', 'Other',
 ];
 
-const today = () => new Date().toISOString().slice(0, 10);
+const today = () => todayNairobi();
 const emptyForm = () => ({ date: today(), amount: '', category: 'Transport', description: '', notes: '' });
 
 function inPeriod(dateStr, period) {
@@ -29,6 +32,14 @@ export default function Expenses() {
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState('month');
   const [visible, setVisible] = useState(50);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // opened from a home-screen shortcut (?new=1)
+  useEffect(() => {
+    if (searchParams.get('new')) {
+      openAdd();
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
   const [category, setCategory] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
@@ -83,8 +94,8 @@ export default function Expenses() {
         await api.put(`/expenses/${editingId}`, payload);
         toast.success('Expense updated');
       } else {
-        await api.post('/expenses', payload);
-        toast.success('Expense added');
+        const saved = await postOrQueue('/expenses', payload, `Expense: ${payload.description || payload.category} - KES ${payload.amount}`);
+        toast.success(saved.queued ? 'No signal - saved on this phone, it will sync when you are online' : 'Expense added');
       }
       setModalOpen(false);
       load();

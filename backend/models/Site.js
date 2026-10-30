@@ -22,6 +22,7 @@ const siteSchema = new mongoose.Schema(
     // optional exact position for the Dashboard map
     latitude: { type: Number, default: null },
     longitude: { type: Number, default: null },
+    defaultRate: { type: Number, default: null }, // optional day rate that fills in when you create a job here
     notes: { type: String, trim: true },
   },
   { timestamps: true }

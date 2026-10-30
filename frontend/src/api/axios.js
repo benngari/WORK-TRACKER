@@ -82,7 +82,7 @@ api.interceptors.response.use(
     const config = err.config;
     const isNetworkError = !err.response;
 
-    if (isNetworkError && config) {
+    if (isNetworkError && config && !config.noRetry) {
       config._retryCount = config._retryCount || 0;
       if (config._retryCount < RETRY_DELAYS_MS.length) {
         const delay = RETRY_DELAYS_MS[config._retryCount];

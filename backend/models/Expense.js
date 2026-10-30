@@ -19,11 +19,13 @@ const expenseSchema = new mongoose.Schema(
     category: { type: String, enum: EXPENSE_CATEGORIES, default: 'Other' },
     description: { type: String, trim: true },
     notes: { type: String, trim: true },
+    clientRequestId: { type: String, trim: true }, // stops an offline retry creating a duplicate
   },
   { timestamps: true }
 );
 
 expenseSchema.index({ owner: 1, date: -1 });
+expenseSchema.index({ owner: 1, clientRequestId: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Expense', expenseSchema);
 module.exports.EXPENSE_CATEGORIES = EXPENSE_CATEGORIES;

@@ -11,11 +11,13 @@ const attendanceSchema = new mongoose.Schema(
     rate: { type: Number, required: true }, // callout rate applied for this specific date
     fare: { type: Number, default: 0 }, // transport cost for this attendance (tracked separately from earnings)
     notes: { type: String, trim: true },
+    clientRequestId: { type: String, trim: true }, // stops an offline retry creating a duplicate
   },
   { timestamps: true }
 );
 
 attendanceSchema.index({ owner: 1, job: 1, date: 1 });
+attendanceSchema.index({ owner: 1, clientRequestId: 1 }, { sparse: true });
 
 attendanceSchema.index({ owner: 1, date: -1 }); // speeds up the sorted list query
 module.exports = mongoose.model('Attendance', attendanceSchema);

@@ -1,0 +1,2 @@
+// today's date in Kenya time (UTC+3) as YYYY-MM-DD, so late-night entries do not land on yesterday
+export const todayNairobi = () => new Date(Date.now() + 3 * 60 * 60 * 1000).toISOString().slice(0, 10);

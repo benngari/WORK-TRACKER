@@ -11,14 +11,19 @@ const siteTypes = ['Bank', 'Office', 'Shop', 'Warehouse', 'Institution', 'Custom
 
 const emptyForm = {
   client: '', siteType: 'Bank', bankName: '', branch: '', branchCode: '',
-  siteName: '', location: '', town: '', county: '', isNairobi: false, notes: '', coords: '',
+  siteName: '', location: '', town: '', county: '', isNairobi: false, notes: '', coords: '', defaultRate: '',
 };
 
 // "-1.2921, 36.8219" (copied from Google Maps) -> latitude and longitude numbers
 function withCoords(form) {
   const { coords, ...rest } = form;
   const m = String(coords || '').match(/(-?\d+(?:\.\d+)?)\s*[, ]\s*(-?\d+(?:\.\d+)?)/);
-  return { ...rest, latitude: m ? Number(m[1]) : null, longitude: m ? Number(m[2]) : null };
+  return {
+    ...rest,
+    latitude: m ? Number(m[1]) : null,
+    longitude: m ? Number(m[2]) : null,
+    defaultRate: rest.defaultRate === '' || rest.defaultRate == null ? null : Number(rest.defaultRate),
+  };
 }
 
 function normalize(str) {
@@ -94,6 +99,7 @@ export default function Sites() {
       isNairobi: site.isNairobi || false,
       notes: site.notes || '',
       coords: site.latitude != null && site.longitude != null ? `${site.latitude}, ${site.longitude}` : '',
+      defaultRate: site.defaultRate ?? '',
     });
     setError('');
     setDuplicateWarning(null);
@@ -322,7 +328,21 @@ export default function Sites() {
             <label className="label">Location / Directions</label>
             <input className="input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} />
           </div>
-                    <div>
+                              <div>
+            <label className="label">Default day rate for this site (optional)</label>
+            <input
+              type="number"
+              min="0"
+              className="input"
+              value={form.defaultRate ?? ''}
+              onChange={(e) => setForm({ ...form, defaultRate: e.target.value })}
+              placeholder="Leave empty to use the client's rate"
+            />
+            <p className="text-xs text-slate-400 mt-1">
+              When you create a job at this site, the rate fills in from here. Otherwise it uses the client's default rate.
+            </p>
+          </div>
+          <div>
             <label className="label">Map coordinates (optional)</label>
             <input
               className="input"

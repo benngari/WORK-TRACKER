@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api/axios';
+import QuickAttendanceModal from '../components/QuickAttendanceModal.jsx';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate, siteLabel } from '../utils/format.js';
@@ -13,6 +14,15 @@ export default function AttendanceHistory() {
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
   const [visible, setVisible] = useState(50);
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  // opened from a home-screen shortcut (?new=1)
+  useEffect(() => {
+    if (searchParams.get('new')) {
+      setRecordOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, []);
 
   const load = () => {
     setLoading(true);
@@ -50,7 +60,10 @@ export default function AttendanceHistory() {
         <input type="date" className="input max-w-xs" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
         <input type="date" className="input max-w-xs" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
         <div className="text-sm text-slate-500 ml-auto">{sorted.length} visit(s)</div>
+        <button onClick={() => setRecordOpen(true)} className="btn-primary">Record Attendance</button>
       </div>
+
+      <QuickAttendanceModal open={recordOpen} onClose={() => setRecordOpen(false)} onDone={load} />
 
       {loading ? (
         <TableSkeleton />

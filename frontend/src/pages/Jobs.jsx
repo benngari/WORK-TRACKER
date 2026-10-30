@@ -8,6 +8,7 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate, siteLabel } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
+import WorkedTodayButton from '../components/WorkedToday.jsx';
 
 const emptyForm = {
   client: '', site: '', jobCardRef: '', jobType: '', description: '',
@@ -211,6 +212,7 @@ export default function Jobs() {
                   <td className="py-2.5 px-4 font-medium text-amber-600">{formatKES(j.outstanding)}</td>
                   <td className="py-2.5 px-4"><StatusBadge status={j.paymentStatus} /></td>
                   <td className="py-2.5 px-4 text-right">
+                    <WorkedTodayButton job={j} onDone={load} iconOnly />
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -267,7 +269,11 @@ export default function Jobs() {
                   + New Site
                 </button>
               </div>
-              <select required className="input" value={form.site} onChange={(e) => setForm({ ...form, site: e.target.value })} disabled={!form.client}>
+              <select required className="input" value={form.site} onChange={(e) => {
+                const site = clientSites.find((s) => s._id === e.target.value);
+                // a site's own default rate wins; otherwise keep the client's rate already filled in
+                setForm({ ...form, site: e.target.value, rate: site && site.defaultRate != null ? site.defaultRate : form.rate });
+              }} disabled={!form.client}>
                 <option value="">Select site...</option>
                 {clientSites.map((s) => <option key={s._id} value={s._id}>{siteLabel(s)}</option>)}
               </select>

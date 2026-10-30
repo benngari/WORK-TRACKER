@@ -22,6 +22,16 @@ exports.list = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    // retries from a phone that was offline must not create the same record twice
+    if (req.body.clientRequestId) {
+      const already = await Attendance.findOne({ owner: req.user.id, clientRequestId: req.body.clientRequestId });
+      if (already) return res.status(200).json(already);
+    }
+    // "Worked today" one-tap: do nothing if that day is already recorded for this job
+    if (req.body.skipIfExists && req.body.date) {
+      const same = await Attendance.findOne({ owner: req.user.id, job: req.body.job, date: new Date(req.body.date) });
+      if (same) return res.status(200).json({ ...same.toObject(), alreadyRecorded: true });
+    }
     const job = await Job.findOne({ _id: req.body.job, owner: req.user.id, deletedAt: null });
     if (!job) return res.status(404).json({ message: 'Job not found' });
 

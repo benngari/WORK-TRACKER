@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
+import WorkedTodayButton from '../components/WorkedToday.jsx';
+import { postOrQueue } from '../utils/offlineQueue.js';
 import { compressImage } from '../utils/compressImage.js';
 import { DetailSkeleton, RowsSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
@@ -51,6 +53,7 @@ export default function JobDetail() {
           <ArrowLeft size={16} /> Back to Jobs
         </button>
         <div className="flex items-center gap-4">
+          <WorkedTodayButton job={job} onDone={load} />
           <button onClick={() => setEditJobOpen(true)} className="flex items-center gap-1.5 text-sm text-brand-600 hover:text-brand-700">
             <Pencil size={15} /> Edit Job
           </button>
@@ -441,7 +444,7 @@ function AttendanceTab({ job, onChange }) {
       }
       try {
         for (const date of validDates) {
-          await api.post('/attendance', {
+          await postOrQueue('/attendance', { // offline-safe bulk
             job: job._id,
             date,
             rate: form.rate,
@@ -467,8 +470,8 @@ function AttendanceTab({ job, onChange }) {
         await api.put(`/attendance/${editingId}`, payload);
         toast.success('Attendance updated');
       } else {
-        await api.post('/attendance', { ...payload, job: job._id });
-        toast.success('Attendance recorded');
+        const saved = await postOrQueue('/attendance', { ...payload, job: job._id }, `Attendance ${payload.date || ''} - ${(job.client && job.client.name) || 'job'}`);
+        toast.success(saved.queued ? 'No signal - saved on this phone, it will sync when you are online' : 'Attendance recorded');
       }
       setModalOpen(false);
       onChange();
