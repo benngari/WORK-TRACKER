@@ -18,6 +18,7 @@ const expenseSchema = new mongoose.Schema(
     amount: { type: Number, required: true, min: 0 },
     category: { type: String, enum: EXPENSE_CATEGORIES, default: 'Other' },
     description: { type: String, trim: true },
+    job: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', default: null }, // set when the expense belongs to one job
     notes: { type: String, trim: true },
     clientRequestId: { type: String, trim: true }, // stops an offline retry creating a duplicate
   },
@@ -25,6 +26,7 @@ const expenseSchema = new mongoose.Schema(
 );
 
 expenseSchema.index({ owner: 1, date: -1 });
+expenseSchema.index({ job: 1 });
 expenseSchema.index({ owner: 1, clientRequestId: 1 }, { sparse: true });
 
 module.exports = mongoose.model('Expense', expenseSchema);

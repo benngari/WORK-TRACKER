@@ -2,19 +2,26 @@ const Job = require('../models/Job');
 const Attendance = require('../models/Attendance');
 const PaymentAllocation = require('../models/PaymentAllocation');
 const JobDocument = require('../models/JobDocument');
+const Expense = require('../models/Expense');
 const { cloudinary } = require('../config/cloudinary');
 
 async function batchComputeFinancials(jobs, ownerId) {
   const jobIds = jobs.map((j) => j._id);
-  const [allAttendance, allAllocations] = await Promise.all([
+  const [allAttendance, allAllocations, allExpenses] = await Promise.all([
     Attendance.find({ job: { $in: jobIds }, owner: ownerId }).lean(),
     PaymentAllocation.find({ job: { $in: jobIds }, owner: ownerId }).lean(),
+    Expense.find({ job: { $in: jobIds }, owner: ownerId }).select('job amount').lean(),
   ]);
 
   const attendanceByJob = {};
   for (const a of allAttendance) {
     const key = String(a.job);
     (attendanceByJob[key] = attendanceByJob[key] || []).push(a);
+  }
+  const expensesByJob = {};
+  for (const x of allExpenses) {
+    const key = String(x.job);
+    expensesByJob[key] = (expensesByJob[key] || 0) + x.amount;
   }
   const paidByJob = {};
   const fareByJob = {};
@@ -40,13 +47,15 @@ async function batchComputeFinancials(jobs, ownerId) {
     else if (paid === expected && expected > 0) paymentStatus = 'Paid';
     else if (paid > expected) paymentStatus = 'Overpaid';
 
-    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, fareReceived, outstanding, paymentStatus };
+    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, fareReceived, outstanding, paymentStatus, expensesTotal: expensesByJob[String(job._id)] || 0 };
   });
 }
 
 async function computeJobFinancials(job) {
   const attendance = await Attendance.find({ job: job._id });
   const allocations = await PaymentAllocation.find({ job: job._id });
+  const jobExpenses = await Expense.find({ job: job._id, owner: job.owner }).select('amount').lean();
+  const expensesTotal = jobExpenses.reduce((sum, x) => sum + x.amount, 0);
   const paid = allocations
     .filter((a) => a.allocationType !== 'Fare')
     .reduce((sum, a) => sum + a.amount, 0);
@@ -62,7 +71,7 @@ async function computeJobFinancials(job) {
   else if (paid === expected && expected > 0) paymentStatus = 'Paid';
   else if (paid > expected) paymentStatus = 'Overpaid';
 
-  return { attendanceCount: attendance.length, expected, paid, fareReceived, outstanding, paymentStatus, attendance };
+  return { attendanceCount: attendance.length, expected, paid, fareReceived, outstanding, paymentStatus, attendance, expensesTotal };
 }
 
 exports.list = async (req, res) => {
@@ -188,6 +197,8 @@ exports.permanentRemove = async (req, res) => {
     await JobDocument.deleteMany({ job: job._id, owner: req.user.id });
     await Attendance.deleteMany({ job: job._id, owner: req.user.id });
     await PaymentAllocation.deleteMany({ job: job._id, owner: req.user.id });
+    // keep the money you spent: it becomes a general expense instead of disappearing
+    await Expense.updateMany({ job: job._id, owner: req.user.id }, { job: null });
     await job.deleteOne();
 
     res.json({ message: 'Permanently deleted' });

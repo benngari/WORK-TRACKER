@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Pencil, Trash2, Download, Receipt } from 'lucide-react';
 import api from '../api/axios';
+import { jobLabel } from '../utils/jobLabel.js';
 import { useSearchParams } from 'react-router-dom';
 import { postOrQueue } from '../utils/offlineQueue.js';
 import { todayNairobi } from '../utils/dates.js';
@@ -16,7 +17,7 @@ const CATEGORIES = [
 ];
 
 const today = () => todayNairobi();
-const emptyForm = () => ({ date: today(), amount: '', category: 'Transport', description: '', notes: '' });
+const emptyForm = () => ({ date: today(), amount: '', category: 'Transport', description: '', notes: '', job: '' });
 
 function inPeriod(dateStr, period) {
   if (period === 'all') return true;
@@ -41,6 +42,7 @@ export default function Expenses() {
     }
   }, []);
   const [category, setCategory] = useState('');
+  const [jobs, setJobs] = useState([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [form, setForm] = useState(emptyForm());
@@ -53,6 +55,9 @@ export default function Expenses() {
   };
 
   useEffect(load, []);
+  useEffect(() => {
+    api.get('/jobs').then((r) => setJobs(r.data)).catch(() => {});
+  }, []);
 
   const filtered = expenses.filter(
     (e) => inPeriod(e.date, period) && (!category || e.category === category)
@@ -79,6 +84,7 @@ export default function Expenses() {
       category: e.category || 'Other',
       description: e.description || '',
       notes: e.notes || '',
+      job: e.job || '',
     });
     setError('');
     setModalOpen(true);
@@ -88,7 +94,7 @@ export default function Expenses() {
     ev.preventDefault();
     setSaving(true);
     setError('');
-    const payload = { ...form, amount: Number(form.amount) };
+    const payload = { ...form, amount: Number(form.amount), job: form.job || null };
     try {
       if (editingId) {
         await api.put(`/expenses/${editingId}`, payload);
@@ -194,6 +200,7 @@ export default function Expenses() {
                 <th className="py-2.5 px-4">Date</th>
                 <th className="py-2.5 px-4">Category</th>
                 <th className="py-2.5 px-4">Description</th>
+                <th className="py-2.5 px-4">Job</th>
                 <th className="py-2.5 px-4">Amount</th>
                 <th className="py-2.5 px-4"></th>
               </tr>
@@ -204,6 +211,9 @@ export default function Expenses() {
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(e.date)}</td>
                   <td className="py-2.5 px-4 text-ink-800">{e.category}</td>
                   <td className="py-2.5 px-4 text-slate-600">{e.description || '-'}</td>
+                  <td className="py-2.5 px-4 text-slate-500">
+                    {e.job ? (jobs.find((x) => x._id === e.job) ? jobLabel(jobs.find((x) => x._id === e.job)) : 'Removed job') : 'General'}
+                  </td>
                   <td className="py-2.5 px-4 font-medium text-red-600">{formatKES(e.amount)}</td>
                   <td className="py-2.5 px-4 text-right whitespace-nowrap">
                     <button onClick={() => openEdit(e)} className="text-slate-400 hover:text-brand-600 mr-3">
@@ -249,6 +259,13 @@ export default function Expenses() {
           <div>
             <label className="label">Description</label>
             <input className="input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} placeholder="e.g. Drill bits, airtime bundle" />
+          </div>
+                    <div>
+            <label className="label">For a job? (optional)</label>
+            <select className="input" value={form.job || ''} onChange={(e) => setForm({ ...form, job: e.target.value })}>
+              <option value="">General expense (not for one job)</option>
+              {jobs.map((j) => <option key={j._id} value={j._id}>{jobLabel(j)}</option>)}
+            </select>
           </div>
           <div>
             <label className="label">Notes (optional)</label>

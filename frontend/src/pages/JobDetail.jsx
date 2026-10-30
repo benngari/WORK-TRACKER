@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
+import JobExpensesTab from '../components/JobExpensesTab.jsx';
 import WorkedTodayButton from '../components/WorkedToday.jsx';
 import { postOrQueue } from '../utils/offlineQueue.js';
 import { compressImage } from '../utils/compressImage.js';
@@ -12,7 +13,7 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate, siteLabel, getThumbnailUrl, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
-const tabs = ['Overview', 'Attendance', 'Payments', 'Documents', 'Notes'];
+const tabs = ['Overview', 'Attendance', 'Payments', 'Expenses', 'Documents', 'Notes'];
 const UNDO_WINDOW_MS = 5000;
 
 export default function JobDetail() {
@@ -115,6 +116,7 @@ export default function JobDetail() {
       {tab === 'Overview' && <OverviewTab job={job} />}
       {tab === 'Attendance' && <AttendanceTab job={job} onChange={load} />}
       {tab === 'Payments' && <PaymentsTab job={job} onChange={load} />}
+      {tab === 'Expenses' && <JobExpensesTab job={job} onChange={load} />}
       {tab === 'Documents' && <DocumentsTab job={job} onChange={load} />}
       {tab === 'Notes' && <NotesTab job={job} onChange={load} />}
 
@@ -352,6 +354,8 @@ function OverviewTab({ job }) {
     <div className="card space-y-3 text-sm">
       <Row label="Description" value={job.description || '-'} />
       <Row label="Job Rate" value={formatKES(job.rate)} />
+      <Row label="Spent on this job" value={formatKES(job.expensesTotal || 0)} />
+      <Row label="Received less expenses" value={formatKES((job.paid || 0) - (job.expensesTotal || 0))} />
       <Row
         label="Payment basis"
         value={job.expectedPaymentOverride != null ? `Whole job - agreed total ${formatKES(job.expectedPaymentOverride)}` : 'Per day (days x rate)'}
