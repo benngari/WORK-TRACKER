@@ -91,15 +91,33 @@ export default function Jobs() {
       const { client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes } = form;
       const { data: job } = await api.post('/jobs', {
         client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes,
+        extraSites: form.extraSites || [],
+        multiSiteMode: form.multiSiteMode || 'oneDay',
         expectedPaymentOverride: form.wholeJob && form.jobTotal !== '' && form.jobTotal != null ? Number(form.jobTotal) : null,
       });
 
-      await api.post('/attendance', {
-        job: job._id,
-        date: form.date,
-        rate: form.rate,
-        fare: form.fare,
-      });
+      // several sites on the first visit: one day for all of them, or one day for each site
+      const extraSiteIds = form.extraSites || [];
+      const visitedSiteIds = [site, ...extraSiteIds];
+      if (extraSiteIds.length && (form.multiSiteMode || 'oneDay') === 'perSite') {
+        for (let i = 0; i < visitedSiteIds.length; i += 1) {
+          await api.post('/attendance', {
+            job: job._id,
+            date: form.date,
+            rate: form.rate,
+            fare: i === 0 ? form.fare : 0,
+            sites: [visitedSiteIds[i]],
+          });
+        }
+      } else {
+        await api.post('/attendance', {
+          job: job._id,
+          date: form.date,
+          rate: form.rate,
+          fare: form.fare,
+          sites: extraSiteIds.length ? visitedSiteIds : undefined,
+        });
+      }
 
       toast.success('Job created');
       setModalOpen(false);
@@ -204,7 +222,7 @@ export default function Jobs() {
                 >
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(j.date)}</td>
                   <td className="py-2.5 px-4 font-medium text-ink-900">{j.client?.name}</td>
-                  <td className="py-2.5 px-4 text-slate-600">{siteLabel(j.site)}</td>
+                  <td className="py-2.5 px-4 text-slate-600">{siteLabel(j.site)}{(j.extraSites || []).length > 0 ? ` +${j.extraSites.length}` : ''}</td>
                   <td className="py-2.5 px-4 text-slate-600">{j.jobCardRef || '-'}</td>
                   <td className="py-2.5 px-4 text-slate-600">{j.attendanceCount}</td>
                   <td className="py-2.5 px-4 text-slate-600">{formatKES(j.expected)}</td>
@@ -251,7 +269,7 @@ export default function Jobs() {
               </div>
               <select required className="input" value={form.client} onChange={(e) => {
                 const client = clients.find((c) => c._id === e.target.value);
-                setForm({ ...form, client: e.target.value, site: '', rate: client?.defaultRate || 1500 });
+                setForm({ ...form, client: e.target.value, site: '', extraSites: [], rate: client?.defaultRate || 1500 });
               }}>
                 <option value="">Select client...</option>
                 {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
@@ -321,6 +339,41 @@ export default function Jobs() {
               </div>
             )}
           </div>
+
+                    {form.client && clientSites.filter((s) => s._id !== form.site).length > 0 && (
+            <div>
+              <label className="label">Other sites covered by this job (optional)</label>
+              <div className="space-y-1 max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                {clientSites.filter((s) => s._id !== form.site).map((s) => (
+                  <label key={s._id} className="flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={(form.extraSites || []).includes(s._id)}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          extraSites: e.target.checked
+                            ? [...(form.extraSites || []), s._id]
+                            : (form.extraSites || []).filter((x) => x !== s._id),
+                        })
+                      }
+                    />
+                    {siteLabel(s)}
+                  </label>
+                ))}
+              </div>
+              {(form.extraSites || []).length > 0 && (
+                <div className="mt-2">
+                  <label className="label">When you visit several of these sites in one day, count it as</label>
+                  <select className="input" value={form.multiSiteMode || 'oneDay'} onChange={(e) => setForm({ ...form, multiSiteMode: e.target.value })}>
+                    <option value="oneDay">One day (one rate for the whole day)</option>
+                    <option value="perSite">One day for each site</option>
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">You can still change this each time you record a visit.</p>
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div>

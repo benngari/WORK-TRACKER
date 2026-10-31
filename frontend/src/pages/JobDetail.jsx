@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
+import { useSiteNames } from '../utils/useSiteNames.js';
 import JobExpensesTab from '../components/JobExpensesTab.jsx';
 import WorkedTodayButton from '../components/WorkedToday.jsx';
 import { postOrQueue } from '../utils/offlineQueue.js';
@@ -70,7 +71,12 @@ export default function JobDetail() {
       <div className="card">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <div className="text-lg font-bold text-ink-900">{job.client?.name} - {siteLabel(job.site)}</div>
+            <div className="text-lg font-bold text-ink-900">
+              {job.client?.name} - {siteLabel(job.site)}
+              {(job.extraSites || []).length > 0 && (
+                <span className="text-slate-400 font-normal text-sm"> +{job.extraSites.length} more site{job.extraSites.length > 1 ? 's' : ''}</span>
+              )}
+            </div>
             <div className="text-sm text-slate-500">{job.jobCardRef || 'No job card ref'} | {job.jobType || 'Job'}</div>
           </div>
           <StatusBadge status={job.paymentStatus} />
@@ -215,6 +221,8 @@ function EditJobModal({ open, onClose, job, onSaved }) {
       rate: job.rate,
       paymentDueDate: job.paymentDueDate ? job.paymentDueDate.slice(0, 10) : '',
       payMode: job.expectedPaymentOverride != null ? 'whole' : 'day',
+      extraSites: (job.extraSites || []).map((s) => String((s && s._id) || s)),
+      multiSiteMode: job.multiSiteMode || 'oneDay',
       expectedPaymentOverride: job.expectedPaymentOverride ?? '',
     });
     setError('');
@@ -260,7 +268,7 @@ function EditJobModal({ open, onClose, job, onSaved }) {
               required
               className="input"
               value={form.client}
-              onChange={(e) => setForm({ ...form, client: e.target.value, site: '' })}
+              onChange={(e) => setForm({ ...form, client: e.target.value, site: '', extraSites: [] })}
             >
               <option value="">Select client...</option>
               {clients.map((c) => <option key={c._id} value={c._id}>{c.name}</option>)}
@@ -307,7 +315,42 @@ function EditJobModal({ open, onClose, job, onSaved }) {
             <input type="date" className="input" value={form.paymentDueDate} onChange={(e) => setForm({ ...form, paymentDueDate: e.target.value })} />
           </div>
         </div>
-                <div>
+                        {form.client && clientSites.filter((s) => s._id !== form.site).length > 0 && (
+            <div>
+              <label className="label">Other sites covered by this job (optional)</label>
+              <div className="space-y-1 max-h-32 overflow-y-auto border border-slate-200 rounded-lg p-2">
+                {clientSites.filter((s) => s._id !== form.site).map((s) => (
+                  <label key={s._id} className="flex items-center gap-2 text-sm text-slate-600">
+                    <input
+                      type="checkbox"
+                      checked={(form.extraSites || []).includes(s._id)}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          extraSites: e.target.checked
+                            ? [...(form.extraSites || []), s._id]
+                            : (form.extraSites || []).filter((x) => x !== s._id),
+                        })
+                      }
+                    />
+                    {siteLabel(s)}
+                  </label>
+                ))}
+              </div>
+              {(form.extraSites || []).length > 0 && (
+                <div className="mt-2">
+                  <label className="label">When you visit several of these sites in one day, count it as</label>
+                  <select className="input" value={form.multiSiteMode || 'oneDay'} onChange={(e) => setForm({ ...form, multiSiteMode: e.target.value })}>
+                    <option value="oneDay">One day (one rate for the whole day)</option>
+                    <option value="perSite">One day for each site</option>
+                  </select>
+                  <p className="text-xs text-slate-400 mt-1">You can still change this each time you record a visit.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div>
           <label className="label">How is this job paid?</label>
           <div className="flex gap-2">
             <button
@@ -350,10 +393,17 @@ function EditJobModal({ open, onClose, job, onSaved }) {
 }
 
 function OverviewTab({ job }) {
+  const overviewSiteNames = useSiteNames();
   return (
     <div className="card space-y-3 text-sm">
       <Row label="Description" value={job.description || '-'} />
       <Row label="Job Rate" value={formatKES(job.rate)} />
+      {(job.extraSites || []).length > 0 && (
+        <>
+          <Row label="Other sites" value={job.extraSites.map((s) => overviewSiteNames(s)).join(', ')} />
+          <Row label="Several sites in one day" value={job.multiSiteMode === 'perSite' ? 'Counted as one day for each site' : 'Counted as one day'} />
+        </>
+      )}
       <Row label="Spent on this job" value={formatKES(job.expensesTotal || 0)} />
       <Row label="Received less expenses" value={formatKES((job.paid || 0) - (job.expensesTotal || 0))} />
       <Row
@@ -391,6 +441,22 @@ function AttendanceTab({ job, onChange }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [pendingDeleteIds, setPendingDeleteIds] = useState(new Set());
+  // jobs that cover several sites: which sites were visited, and whether that counts as one day or one day per site
+  const siteNames = useSiteNames();
+  const jobSiteIds = Array.from(
+    new Set([job.site && (job.site._id || job.site), ...(job.extraSites || [])].filter(Boolean).map((s) => String((s && s._id) || s)))
+  );
+  const hasExtraSites = jobSiteIds.length > 1;
+  const [visitedSites, setVisitedSites] = useState([]);
+  const [siteMode, setSiteMode] = useState(job.multiSiteMode || 'oneDay');
+
+  // one record for the day, or one record for each site visited - depending on how you want to count it
+  const recordsFor = (base) => {
+    if (!hasExtraSites) return [base];
+    const picked = visitedSites.length ? visitedSites : [jobSiteIds[0]];
+    if (picked.length === 1 || siteMode === 'oneDay') return [{ ...base, sites: picked }];
+    return picked.map((siteId, i) => ({ ...base, sites: [siteId], fare: i === 0 ? base.fare : 0 }));
+  };
   const timersRef = useRef({});
 
   useEffect(() => () => {
@@ -401,6 +467,8 @@ function AttendanceTab({ job, onChange }) {
     setEditingId(null);
     setBulkMode(false);
     setForm(emptyAttendanceForm(job.rate));
+    setVisitedSites(jobSiteIds);
+    setSiteMode(job.multiSiteMode || 'oneDay');
     setBulkDates(['']);
     setFareNeeded(false);
     setError('');
@@ -448,7 +516,7 @@ function AttendanceTab({ job, onChange }) {
       }
       try {
         for (const date of validDates) {
-          await postOrQueue('/attendance', { // offline-safe bulk
+          const records = recordsFor({
             job: job._id,
             date,
             rate: form.rate,
@@ -456,6 +524,7 @@ function AttendanceTab({ job, onChange }) {
             fare: fareNeeded ? form.fare : 0,
             notes: form.notes,
           });
+          for (const record of records) await postOrQueue('/attendance', record);
         }
         toast.success(`${validDates.length} attendance record${validDates.length > 1 ? 's' : ''} added`);
         setModalOpen(false);
@@ -474,7 +543,11 @@ function AttendanceTab({ job, onChange }) {
         await api.put(`/attendance/${editingId}`, payload);
         toast.success('Attendance updated');
       } else {
-        const saved = await postOrQueue('/attendance', { ...payload, job: job._id }, `Attendance ${payload.date || ''} - ${(job.client && job.client.name) || 'job'}`);
+        const saved = { queued: false };
+        for (const record of recordsFor({ ...payload, job: job._id })) {
+          const result = await postOrQueue('/attendance', record, `Attendance ${payload.date || ''} - ${(job.client && job.client.name) || 'job'}`);
+          if (result.queued) saved.queued = true;
+        }
         toast.success(saved.queued ? 'No signal - saved on this phone, it will sync when you are online' : 'Attendance recorded');
       }
       setModalOpen(false);
@@ -519,6 +592,7 @@ function AttendanceTab({ job, onChange }) {
               <th className="py-2.5 px-4">Date</th>
               <th className="py-2.5 px-4">Time</th>
               <th className="py-2.5 px-4">Shift</th>
+              {hasExtraSites && <th className="py-2.5 px-4">Sites</th>}
               <th className="py-2.5 px-4">Rate</th>
               <th className="py-2.5 px-4">Fare Needed?</th>
               <th className="py-2.5 px-4"></th>
@@ -530,6 +604,11 @@ function AttendanceTab({ job, onChange }) {
                 <td className="py-2 px-4">{formatDate(a.date)}</td>
                 <td className="py-2 px-4 text-slate-500">{a.startTime || '-'}{a.endTime ? ` - ${a.endTime}` : ''}</td>
                 <td className="py-2 px-4 text-slate-500">{a.shift}</td>
+                {hasExtraSites && (
+                  <td className="py-2 px-4 text-slate-500">
+                    {(a.sites && a.sites.length ? a.sites : [jobSiteIds[0]]).map((s) => siteNames(s)).join(', ')}
+                  </td>
+                )}
                 <td className="py-2 px-4 text-slate-500">{formatKES(a.rate)}</td>
                 <td className="py-2 px-4">
                   {a.fare > 0 ? (
@@ -641,6 +720,37 @@ function AttendanceTab({ job, onChange }) {
               <input type="number" className="input" value={form.rate} onChange={(e) => setForm({ ...form, rate: Number(e.target.value) })} />
             </div>
           </div>
+
+                    {!editingId && hasExtraSites && (
+            <div className="border border-slate-200 rounded-lg p-3 space-y-2">
+              <div className="text-sm font-medium text-ink-800">Sites visited</div>
+              {jobSiteIds.map((id) => (
+                <label key={id} className="flex items-center gap-2 text-sm text-slate-600">
+                  <input
+                    type="checkbox"
+                    checked={visitedSites.includes(id)}
+                    onChange={(e) =>
+                      setVisitedSites(e.target.checked ? [...visitedSites, id] : visitedSites.filter((x) => x !== id))
+                    }
+                  />
+                  {siteNames(id)}
+                </label>
+              ))}
+              {visitedSites.length > 1 && (
+                <div>
+                  <label className="label">Count these visits as</label>
+                  <select className="input" value={siteMode} onChange={(e) => setSiteMode(e.target.value)}>
+                    <option value="oneDay">One day (one rate for all the sites)</option>
+                    <option value="perSite">One day for each site</option>
+                  </select>
+                </div>
+              )}
+              <p className="text-xs text-slate-400">
+                This will record {siteMode === 'perSite' && visitedSites.length > 1 ? `${visitedSites.length} days (one for each site)` : '1 day'}
+                {bulkMode ? ' for each date' : ''}.
+              </p>
+            </div>
+          )}
 
           <div className="border border-slate-200 rounded-lg p-3 space-y-2">
             <label className="flex items-center gap-2 text-sm font-medium text-ink-800">

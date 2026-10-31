@@ -12,6 +12,8 @@ const attendanceSchema = new mongoose.Schema(
     fare: { type: Number, default: 0 }, // transport cost for this attendance (tracked separately from earnings)
     notes: { type: String, trim: true },
     clientRequestId: { type: String, trim: true }, // stops an offline retry creating a duplicate
+    // sites visited for this record (only used for jobs that cover several sites)
+    sites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Site' }],
   },
   { timestamps: true }
 );

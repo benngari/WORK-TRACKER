@@ -92,6 +92,8 @@
   html.dark .leaflet-control-zoom a { background: #0b0b0d; color: #e5e7eb; border-color: #2a2a2e; }
   html.dark .leaflet-control-attribution { background: rgba(0, 0, 0, 0.6); color: #99a2b0; }
   html.dark .leaflet-control-attribution a { color: #6ee7b7; }
+  /* satellite photos must not be inverted in dark mode */
+  html.dark .wt-satellite .leaflet-tile-pane { filter: none; }
 
   /* charts (Dashboard) */
   html.dark .recharts-cartesian-grid line { stroke: #26262b; }

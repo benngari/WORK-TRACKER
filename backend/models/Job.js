@@ -17,6 +17,10 @@ const jobSchema = new mongoose.Schema(
     // Expected payment can be auto-calculated from attendance count * rate,
     // but we keep it stored so it can be manually overridden.
     expectedPaymentOverride: { type: Number, default: null },
+    // a callout that covers several sites (the main site is in `site`)
+    extraSites: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Site' }],
+    // when several sites are visited in one day: count it as one day, or one day for each site
+    multiSiteMode: { type: String, enum: ['oneDay', 'perSite'], default: 'oneDay' },
     paymentDueDate: { type: Date, default: null },
     paymentStatus: {
       type: String,
