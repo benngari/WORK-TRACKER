@@ -6,6 +6,7 @@ import { formatKES, siteLabel } from '../utils/format.js';
 import { downloadCSV } from '../utils/exportCsv.js';
 import { SortTh, useSort } from '../components/SortHeader.jsx';
 import PaymentReport from '../components/PaymentReport.jsx';
+import PaidBalanceReport from '../components/PaidBalanceReport.jsx';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export default function Reports() {
@@ -16,11 +17,13 @@ export default function Reports() {
         <TabsList>
           <TabsTrigger value="profit">Client Profit</TabsTrigger>
           <TabsTrigger value="payments">Payment Report</TabsTrigger>
+          <TabsTrigger value="balance">Paid and Balance</TabsTrigger>
           <TabsTrigger value="sites">Sites by Client</TabsTrigger>
         </TabsList>
       </Tabs>
       {view === 'profit' && <ClientProfit />}
       {view === 'payments' && <PaymentReport />}
+      {view === 'balance' && <PaidBalanceReport />}
       {view === 'sites' && <SitesByClient />}
     </div>
   );

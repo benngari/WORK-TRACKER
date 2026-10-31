@@ -47,7 +47,11 @@ async function batchComputeFinancials(jobs, ownerId) {
     else if (paid === expected && expected > 0) paymentStatus = 'Paid';
     else if (paid > expected) paymentStatus = 'Overpaid';
 
-    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, fareReceived, outstanding, paymentStatus, expensesTotal: expensesByJob[String(job._id)] || 0 };
+    return { ...job, attendanceCount: jobAttendance.length, attendance: jobAttendance, expected, paid, fareReceived, outstanding, paymentStatus, expensesTotal: expensesByJob[String(job._id)] || 0,
+      // first and last visit dates, so reports can group jobs by when they were worked
+      firstVisit: jobAttendance.length ? new Date(Math.min(...jobAttendance.map((a) => new Date(a.date).getTime()))) : null,
+      lastVisit: jobAttendance.length ? new Date(Math.max(...jobAttendance.map((a) => new Date(a.date).getTime()))) : null,
+    };
   });
 }
 
