@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Download, ChevronDown, ChevronRight } from 'lucide-react';
+import { Download, FileDown, ChevronDown, ChevronRight } from 'lucide-react';
 import api from '../api/axios';
 import { TableSkeleton } from './Skeletons.jsx';
 import StatusBadge from './StatusBadge.jsx';
@@ -111,6 +111,30 @@ export default function PaidBalanceReport() {
     downloadCSV(`paid-and-balance-${by}-${new Date().toISOString().slice(0, 10)}.csv`, headers, csv);
   };
 
+  const periodText = () => {
+    if (period === 'year') return 'This year';
+    if (period === 'month') return 'This month';
+    if (period === 'custom') return `${from ? formatDate(from) : 'start'} to ${to ? formatDate(to) : 'today'}`;
+    return 'All time';
+  };
+
+  const handlePdf = async () => {
+    try {
+      const { buildBalancePdf } = await import('../utils/reportPdf.js');
+      const doc = await buildBalancePdf({
+        rows: sorted,
+        totals,
+        percentAll,
+        groupLabel: (GROUPS.find((g) => g[0] === by) || GROUPS[0])[1],
+        periodText: periodText(),
+        onlyOwing,
+      });
+      doc.save(`paid-and-balance-${by}-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (err) {
+      setError('Could not create the PDF. Please try again.');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="card flex flex-wrap items-end gap-3">
@@ -145,9 +169,14 @@ export default function PaidBalanceReport() {
           <input type="checkbox" checked={onlyOwing} onChange={(e) => setOnlyOwing(e.target.checked)} />
           Only where a balance remains
         </label>
-        <button onClick={handleExport} disabled={rows.length === 0} className="btn-secondary flex items-center gap-1.5 ml-auto">
-          <Download size={15} /> Export CSV
-        </button>
+        <div className="flex gap-2 ml-auto">
+          <button onClick={handleExport} disabled={rows.length === 0} className="btn-secondary flex items-center gap-1.5">
+            <Download size={15} /> Export CSV
+          </button>
+          <button onClick={handlePdf} disabled={rows.length === 0} className="btn-primary flex items-center gap-1.5">
+            <FileDown size={15} /> Download PDF
+          </button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
