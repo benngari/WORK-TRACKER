@@ -1,110 +1,208 @@
-/* Black "lights out" dark mode. Active when <html> has the class "dark". Screen only - printing stays light. */
+/* Dark themes. Active when <html> has the class "dark".
+   Black (lights out) is the default dark look; add the class "dark-soft" for the softer, easier-on-the-eyes version.
+   Screen only - printing stays light. */
 @media screen {
-  html.dark { color-scheme: dark; }
+  /* ---- Black (lights out): pure black page, near-black cards ---- */
+  html.dark {
+    color-scheme: dark;
+    --wt-page: #000000;
+    --wt-surface: #0b0b0d;
+    --wt-hover: #141418;
+    --wt-fill1: #1a1a1e;
+    --wt-fill2: #1f1f24;
+    --wt-sidebar: #000000;
+    --wt-border1: #1c1c20;
+    --wt-border2: #2a2a2e;
+    --wt-border3: #3a3a40;
+    --wt-text-strong: #f3f4f6;
+    --wt-text: #e5e7eb;
+    --wt-text7: #d1d5db;
+    --wt-text6: #b4bcc8;
+    --wt-text5: #99a2b0;
+    --wt-text4: #7f8998;
+    --wt-text-hover: #ffffff;
+    --wt-input: #0b0b0d;
+    --wt-input-off: #141418;
+    --wt-placeholder: #6b7280;
+    --wt-scroll: #333338;
+    --wt-red: #f87171;
+    --wt-red-soft: #fca5a5;
+    --wt-amber: #fbbf24;
+    --wt-blue: #93c5fd;
+    --wt-purple: #d8b4fe;
+    --wt-green: #4ade80;
+    --wt-brand: #3fc98f;
+    --wt-brand-hover: #6ee7b7;
+    --wt-tint-red: rgba(239, 68, 68, 0.14);
+    --wt-tint-red-faint: rgba(239, 68, 68, 0.08);
+    --wt-tint-amber: rgba(245, 158, 11, 0.14);
+    --wt-tint-blue: rgba(59, 130, 246, 0.16);
+    --wt-tint-purple: rgba(168, 85, 247, 0.16);
+    --wt-tint-green: rgba(34, 197, 94, 0.14);
+    --wt-tint-brand: rgba(38, 168, 115, 0.16);
+    --wt-tint-brand-strong: rgba(38, 168, 115, 0.24);
+    --wt-line-amber: rgba(245, 158, 11, 0.3);
+    --wt-line-red: rgba(239, 68, 68, 0.3);
+    --wt-line-brand: rgba(38, 168, 115, 0.35);
+    --wt-map-filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9);
+    --wt-map-bg: #0b0b0d;
+    --wt-attribution-bg: rgba(0, 0, 0, 0.6);
+    --wt-chart-grid: #26262b;
+    --wt-chart-axis: #3a3a40;
+  }
 
-  /* surfaces: pure black page, near-black cards */
-  html.dark, html.dark body { background-color: #000; color: #e5e7eb; }
-  html.dark .bg-slate-50 { background-color: #000; }
+  /* ---- Soft dark: charcoal-blue, gentler contrast, slightly muted colours ---- */
+  html.dark.dark-soft {
+    --wt-page: #20252d;
+    --wt-surface: #2a303a;
+    --wt-hover: #333a45;
+    --wt-fill1: #323945;
+    --wt-fill2: #3a424e;
+    --wt-sidebar: #1a1e25;
+    --wt-border1: #363d49;
+    --wt-border2: #424a58;
+    --wt-border3: #525b6a;
+    --wt-text-strong: #dde4ec;
+    --wt-text: #cdd5df;
+    --wt-text7: #bcc5d1;
+    --wt-text6: #a6b0be;
+    --wt-text5: #97a2b2;
+    --wt-text4: #8e9aab;
+    --wt-text-hover: #eef2f6;
+    --wt-input: #232932;
+    --wt-input-off: #2e3540;
+    --wt-placeholder: #7d8898;
+    --wt-scroll: #4a5260;
+    --wt-red: #ea8f8a;
+    --wt-red-soft: #f0a29d;
+    --wt-amber: #e3b768;
+    --wt-blue: #92b9ee;
+    --wt-purple: #c8aaee;
+    --wt-green: #86d4a3;
+    --wt-brand: #6fcda2;
+    --wt-brand-hover: #92dcb9;
+    --wt-tint-red: rgba(234, 143, 138, 0.14);
+    --wt-tint-red-faint: rgba(234, 143, 138, 0.08);
+    --wt-tint-amber: rgba(227, 183, 104, 0.14);
+    --wt-tint-blue: rgba(146, 185, 238, 0.14);
+    --wt-tint-purple: rgba(200, 170, 238, 0.14);
+    --wt-tint-green: rgba(134, 212, 163, 0.13);
+    --wt-tint-brand: rgba(111, 205, 162, 0.14);
+    --wt-tint-brand-strong: rgba(111, 205, 162, 0.22);
+    --wt-line-amber: rgba(227, 183, 104, 0.3);
+    --wt-line-red: rgba(234, 143, 138, 0.3);
+    --wt-line-brand: rgba(111, 205, 162, 0.35);
+    --wt-map-filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.78) saturate(0.85);
+    --wt-map-bg: #2a303a;
+    --wt-attribution-bg: rgba(32, 37, 45, 0.7);
+    --wt-chart-grid: #38404c;
+    --wt-chart-axis: #4a5260;
+  }
+
+  /* surfaces */
+  html.dark, html.dark body { background-color: var(--wt-page); color: var(--wt-text); }
+  html.dark .bg-slate-50 { background-color: var(--wt-page); }
   html.dark .bg-white,
-  html.dark .card { background-color: #0b0b0d; }
+  html.dark .card { background-color: var(--wt-surface); }
   html.dark .card { box-shadow: none; }
-  html.dark .bg-slate-100 { background-color: #1a1a1e; }
-  html.dark .bg-slate-200 { background-color: #1f1f24; }
-  html.dark .hover\:bg-slate-50:hover { background-color: #141418; }
-  html.dark .btn-secondary { background-color: #0b0b0d; color: #e5e7eb; border-color: #2a2a2e; }
-  html.dark .btn-secondary:hover { background-color: #141418; }
+  html.dark .bg-slate-100 { background-color: var(--wt-fill1); }
+  html.dark .bg-slate-200 { background-color: var(--wt-fill2); }
+  html.dark .hover\:bg-slate-50:hover { background-color: var(--wt-hover); }
+  html.dark .btn-secondary { background-color: var(--wt-surface); color: var(--wt-text); border-color: var(--wt-border2); }
+  html.dark .btn-secondary:hover { background-color: var(--wt-hover); }
 
   /* sidebar */
-  html.dark .bg-ink-900 { background-color: #000; }
-  html.dark aside { border-right: 1px solid #1c1c20; }
+  html.dark .bg-ink-900 { background-color: var(--wt-sidebar); }
+  html.dark aside { border-right: 1px solid var(--wt-border1); }
 
   /* borders */
   html.dark .border-slate-50,
-  html.dark .border-slate-100 { border-color: #1c1c20; }
-  html.dark .border-slate-200 { border-color: #2a2a2e; }
-  html.dark .border-slate-300 { border-color: #3a3a40; }
-  html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) { border-color: #1c1c20; }
+  html.dark .border-slate-100 { border-color: var(--wt-border1); }
+  html.dark .border-slate-200 { border-color: var(--wt-border2); }
+  html.dark .border-slate-300 { border-color: var(--wt-border3); }
+  html.dark .divide-slate-50 > :not([hidden]) ~ :not([hidden]) { border-color: var(--wt-border1); }
 
   /* text */
-  html.dark .text-ink-900 { color: #f3f4f6; }
-  html.dark .text-ink-800 { color: #e5e7eb; }
-  html.dark .text-slate-700 { color: #d1d5db; }
-  html.dark .text-slate-600 { color: #b4bcc8; }
-  html.dark .text-slate-500 { color: #99a2b0; }
-  html.dark .text-slate-400 { color: #7f8998; }
-  html.dark .hover\:text-slate-600:hover { color: #d1d5db; }
-  html.dark .hover\:text-ink-900:hover { color: #ffffff; }
+  html.dark .text-ink-900 { color: var(--wt-text-strong); }
+  html.dark .text-ink-800 { color: var(--wt-text); }
+  html.dark .text-slate-700 { color: var(--wt-text7); }
+  html.dark .text-slate-600 { color: var(--wt-text6); }
+  html.dark .text-slate-500 { color: var(--wt-text5); }
+  html.dark .text-slate-400 { color: var(--wt-text4); }
+  html.dark .hover\:text-slate-600:hover { color: var(--wt-text7); }
+  html.dark .hover\:text-ink-900:hover { color: var(--wt-text-hover); }
 
   /* coloured text */
-  html.dark .text-red-500 { color: #f87171; }
+  html.dark .text-red-500 { color: var(--wt-red); }
   html.dark .text-red-600,
-  html.dark .text-red-700 { color: #fca5a5; }
+  html.dark .text-red-700 { color: var(--wt-red-soft); }
   html.dark .text-amber-500,
   html.dark .text-amber-600,
-  html.dark .text-amber-700 { color: #fbbf24; }
+  html.dark .text-amber-700 { color: var(--wt-amber); }
   html.dark .text-blue-600,
-  html.dark .text-blue-700 { color: #93c5fd; }
-  html.dark .text-purple-700 { color: #d8b4fe; }
-  html.dark .text-green-700 { color: #4ade80; }
+  html.dark .text-blue-700 { color: var(--wt-blue); }
+  html.dark .text-purple-700 { color: var(--wt-purple); }
+  html.dark .text-green-700 { color: var(--wt-green); }
   html.dark .text-brand-600,
-  html.dark .text-brand-700 { color: #3fc98f; }
+  html.dark .text-brand-700 { color: var(--wt-brand); }
   html.dark .hover\:text-brand-600:hover,
-  html.dark .hover\:text-brand-700:hover { color: #6ee7b7; }
+  html.dark .hover\:text-brand-700:hover { color: var(--wt-brand-hover); }
 
   /* tinted backgrounds (badges, alerts) */
-  html.dark .bg-red-50 { background-color: rgba(239, 68, 68, 0.14); }
-  html.dark .bg-red-50\/50 { background-color: rgba(239, 68, 68, 0.08); }
-  html.dark .bg-amber-50 { background-color: rgba(245, 158, 11, 0.14); }
-  html.dark .bg-blue-50 { background-color: rgba(59, 130, 246, 0.16); }
-  html.dark .bg-purple-50 { background-color: rgba(168, 85, 247, 0.16); }
-  html.dark .bg-green-50 { background-color: rgba(34, 197, 94, 0.14); }
-  html.dark .bg-brand-50 { background-color: rgba(38, 168, 115, 0.16); }
+  html.dark .bg-red-50 { background-color: var(--wt-tint-red); }
+  html.dark .bg-red-50\/50 { background-color: var(--wt-tint-red-faint); }
+  html.dark .bg-amber-50 { background-color: var(--wt-tint-amber); }
+  html.dark .bg-blue-50 { background-color: var(--wt-tint-blue); }
+  html.dark .bg-purple-50 { background-color: var(--wt-tint-purple); }
+  html.dark .bg-green-50 { background-color: var(--wt-tint-green); }
+  html.dark .bg-brand-50 { background-color: var(--wt-tint-brand); }
   html.dark .bg-brand-100,
-  html.dark .hover\:bg-brand-100:hover { background-color: rgba(38, 168, 115, 0.24); }
-  html.dark .border-amber-100 { border-color: rgba(245, 158, 11, 0.3); }
-  html.dark .border-red-100 { border-color: rgba(239, 68, 68, 0.3); }
+  html.dark .hover\:bg-brand-100:hover { background-color: var(--wt-tint-brand-strong); }
+  html.dark .border-amber-100 { border-color: var(--wt-line-amber); }
+  html.dark .border-red-100 { border-color: var(--wt-line-red); }
   html.dark .border-brand-100,
-  html.dark .border-brand-200 { border-color: rgba(38, 168, 115, 0.35); }
+  html.dark .border-brand-200 { border-color: var(--wt-line-brand); }
 
   /* form controls */
   html.dark .input,
   html.dark input:not([type='checkbox']):not([type='radio']):not([type='file']):not([type='range']),
   html.dark select,
   html.dark textarea {
-    background-color: #0b0b0d;
-    color: #e5e7eb;
-    border-color: #2a2a2e;
+    background-color: var(--wt-input);
+    color: var(--wt-text);
+    border-color: var(--wt-border2);
   }
   html.dark input::placeholder,
-  html.dark textarea::placeholder { color: #6b7280; }
-  html.dark select option { background-color: #0b0b0d; color: #e5e7eb; }
+  html.dark textarea::placeholder { color: var(--wt-placeholder); }
+  html.dark select option { background-color: var(--wt-input); color: var(--wt-text); }
   html.dark input:disabled,
   html.dark select:disabled,
-  html.dark textarea:disabled { background-color: #141418; color: #7f8998; }
+  html.dark textarea:disabled { background-color: var(--wt-input-off); color: var(--wt-text4); }
 
   /* scrollbars */
-  html.dark ::-webkit-scrollbar-thumb { background: #333338; }
+  html.dark ::-webkit-scrollbar-thumb { background: var(--wt-scroll); }
+
   /* sites map: darken the map tiles and controls */
-  html.dark .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9); }
-  html.dark .leaflet-container { background: #0b0b0d; }
+  html.dark .leaflet-tile-pane { filter: var(--wt-map-filter); }
+  html.dark .leaflet-container { background: var(--wt-map-bg); }
   html.dark .leaflet-popup-content-wrapper,
-  html.dark .leaflet-popup-tip { background: #0b0b0d; color: #e5e7eb; }
-  html.dark .leaflet-control-zoom a { background: #0b0b0d; color: #e5e7eb; border-color: #2a2a2e; }
-  html.dark .leaflet-control-attribution { background: rgba(0, 0, 0, 0.6); color: #99a2b0; }
-  html.dark .leaflet-control-attribution a { color: #6ee7b7; }
+  html.dark .leaflet-popup-tip { background: var(--wt-surface); color: var(--wt-text); }
+  html.dark .leaflet-control-zoom a { background: var(--wt-surface); color: var(--wt-text); border-color: var(--wt-border2); }
+  html.dark .leaflet-control-attribution { background: var(--wt-attribution-bg); color: var(--wt-text5); }
+  html.dark .leaflet-control-attribution a { color: var(--wt-brand-hover); }
   /* satellite photos must not be inverted in dark mode */
   html.dark .wt-satellite .leaflet-tile-pane { filter: none; }
 
   /* charts (Dashboard) */
-  html.dark .recharts-cartesian-grid line { stroke: #26262b; }
+  html.dark .recharts-cartesian-grid line { stroke: var(--wt-chart-grid); }
   html.dark .recharts-cartesian-axis-line,
-  html.dark .recharts-cartesian-axis-tick-line { stroke: #3a3a40; }
+  html.dark .recharts-cartesian-axis-tick-line { stroke: var(--wt-chart-axis); }
   html.dark .recharts-text,
-  html.dark .recharts-cartesian-axis-tick-value { fill: #99a2b0; }
-  html.dark .recharts-legend-item-text { color: #b4bcc8 !important; }
+  html.dark .recharts-cartesian-axis-tick-value { fill: var(--wt-text5); }
+  html.dark .recharts-legend-item-text { color: var(--wt-text6) !important; }
   html.dark .recharts-default-tooltip {
-    background-color: #0b0b0d !important;
-    border-color: #2a2a2e !important;
+    background-color: var(--wt-surface) !important;
+    border-color: var(--wt-border2) !important;
   }
-  html.dark .recharts-tooltip-label { color: #e5e7eb !important; }
+  html.dark .recharts-tooltip-label { color: var(--wt-text) !important; }
 }
