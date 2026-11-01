@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Plus, Trash2, Upload, FileText, Link2, File as FileIcon, Pencil, Copy, X } from 'lucide-react';
 import api from '../api/axios';
+import SiteLocationCard from '../components/SiteLocationCard.jsx';
 import { useSiteNames } from '../utils/useSiteNames.js';
 import JobExpensesTab from '../components/JobExpensesTab.jsx';
 import WorkedTodayButton from '../components/WorkedToday.jsx';
@@ -120,6 +121,7 @@ export default function JobDetail() {
       </div>
 
       {tab === 'Overview' && <OverviewTab job={job} />}
+      {tab === 'Overview' && <SiteLocationCard site={job.site} onSaved={load} />}
       {tab === 'Attendance' && <AttendanceTab job={job} onChange={load} />}
       {tab === 'Payments' && <PaymentsTab job={job} onChange={load} />}
       {tab === 'Expenses' && <JobExpensesTab job={job} onChange={load} />}
@@ -412,6 +414,16 @@ function OverviewTab({ job }) {
       />
       <Row label="Status" value={job.status} />
       <Row label="Payment Due Date" value={formatDate(job.paymentDueDate)} />
+      <Row
+        label="Paid on"
+        value={
+          (job.allocations || [])
+            .filter((a) => a.allocationType !== 'Fare' && a.payment && a.payment.receivedDate)
+            .sort((a, b) => new Date(a.payment.receivedDate) - new Date(b.payment.receivedDate))
+            .map((a) => `${formatDate(a.payment.receivedDate)} (${formatKES(a.amount)})`)
+            .join(', ') || '-'
+        }
+      />
       <Row label="Created" value={formatDate(job.createdAt)} />
     </div>
   );

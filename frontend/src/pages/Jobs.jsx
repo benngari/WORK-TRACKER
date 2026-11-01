@@ -375,6 +375,18 @@ export default function Jobs() {
             </div>
           )}
 
+                    {form.site && (() => {
+            const chosen = clientSites.find((s) => s._id === form.site);
+            if (!chosen) return null;
+            const hasCoords = chosen.latitude != null && chosen.longitude != null;
+            const place = [chosen.location, chosen.town, chosen.county].filter(Boolean).join(', ');
+            return (
+              <div className="text-xs rounded-lg bg-slate-100 text-slate-600 px-3 py-2">
+                Location: {place || 'not added yet'} | {hasCoords ? `coordinates saved (${Number(chosen.latitude).toFixed(5)}, ${Number(chosen.longitude).toFixed(5)})` : 'No coordinates saved yet - add them from the job page after saving.'}
+              </div>
+            );
+          })()}
+
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="label">Job Card / Reference</label>

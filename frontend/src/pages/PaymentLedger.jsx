@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Download, Printer } from 'lucide-react';
+import { Download, Printer, FileDown } from 'lucide-react';
 import api from '../api/axios';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 import StatusBadge from '../components/StatusBadge.jsx';
@@ -20,6 +20,7 @@ export default function PaymentLedger() {
   const { sorted, sort, toggle } = useSort(rows, 'jobDate', 'desc', {
     jobDate: (r) => time(r.jobDate),
     paymentDueDate: (r) => time(r.paymentDueDate),
+    paidOn: (r) => time(r.paidOn),
   });
 
   const load = () => {
@@ -39,7 +40,7 @@ export default function PaymentLedger() {
   );
 
   const handleExportCSV = () => {
-    const headers = ['Job Date', 'Client', 'Site', 'Job Card', 'Callouts', 'Expected', 'Paid', 'Balance', 'Payment Due Date', 'Status'];
+    const headers = ['Job Date', 'Client', 'Site', 'Job Card', 'Callouts', 'Expected', 'Paid', 'Balance', 'Paid On', 'Payment Due Date', 'Status'];
     const csvRows = sorted.map((r) => [
       formatDate(r.jobDate),
       r.client || '',
@@ -49,10 +50,19 @@ export default function PaymentLedger() {
       r.expected,
       r.paid,
       r.balance,
+      (r.paidDates || []).map((p) => formatDate(p.date)).join('; ') || formatDate(r.paidOn),
       formatDate(r.paymentDueDate),
       r.status,
     ]);
     downloadCSV(`payment-ledger-${new Date().toISOString().slice(0, 10)}.csv`, headers, csvRows);
+  };
+
+  const handleDownloadPdf = async () => {
+    const { buildLedgerPdf } = await import('../utils/reportPdf.js');
+    const clientName = clients.find((c) => c._id === filters.client)?.name || 'All clients';
+    const dates = filters.from || filters.to ? `${filters.from ? formatDate(filters.from) : 'start'} to ${filters.to ? formatDate(filters.to) : 'today'}` : 'All dates';
+    const doc = await buildLedgerPdf({ rows: sorted, filtersText: `${clientName} | ${filters.status || 'All statuses'} | ${dates}`, groupByClient: true });
+    doc.save(`payment-ledger-${new Date().toISOString().slice(0, 10)}.pdf`);
   };
 
   const th = 'py-2.5 px-4';
@@ -76,6 +86,9 @@ export default function PaymentLedger() {
         <div className="flex gap-2 ml-auto">
           <button onClick={handleExportCSV} className="btn-secondary flex items-center gap-1.5">
             <Download size={15} /> Export CSV
+          </button>
+          <button onClick={handleDownloadPdf} className="btn-primary flex items-center gap-1.5">
+            <FileDown size={15} /> Download PDF
           </button>
           <button onClick={() => window.print()} className="btn-secondary flex items-center gap-1.5">
             <Printer size={15} /> Print / PDF
@@ -104,6 +117,7 @@ export default function PaymentLedger() {
                 <SortTh label="Expected" k="expected" sort={sort} onSort={toggle} firstDir="desc" className={th} />
                 <SortTh label="Paid" k="paid" sort={sort} onSort={toggle} firstDir="desc" className={th} />
                 <SortTh label="Balance" k="balance" sort={sort} onSort={toggle} firstDir="desc" className={th} />
+                <SortTh label="Paid On" k="paidOn" sort={sort} onSort={toggle} className={th} />
                 <SortTh label="Due Date" k="paymentDueDate" sort={sort} onSort={toggle} className={th} />
                 <SortTh label="Status" k="status" sort={sort} onSort={toggle} className={th} />
               </tr>
@@ -119,6 +133,7 @@ export default function PaymentLedger() {
                   <td className="py-2.5 px-4">{formatKES(r.expected)}</td>
                   <td className="py-2.5 px-4">{formatKES(r.paid)}</td>
                   <td className="py-2.5 px-4 font-medium text-amber-600">{formatKES(r.balance)}</td>
+                  <td className="py-2.5 px-4 text-slate-600">{(r.paidDates || []).length ? r.paidDates.map((p, i) => <div key={i}>{formatDate(p.date)}</div>) : '-'}</td>
                   <td className="py-2.5 px-4 text-slate-600">{formatDate(r.paymentDueDate)}</td>
                   <td className="py-2.5 px-4"><StatusBadge status={r.status} /></td>
                 </tr>

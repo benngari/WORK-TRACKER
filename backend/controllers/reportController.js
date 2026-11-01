@@ -32,6 +32,8 @@ exports.ledger = async (req, res) => {
         paid: job.paid,
         balance: job.outstanding,
         paymentDueDate: job.paymentDueDate,
+        paidOn: job.lastPaidDate,
+        paidDates: job.paidDates,
         status: job.paymentStatus,
       };
     });

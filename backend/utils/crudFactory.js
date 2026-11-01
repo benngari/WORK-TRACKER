@@ -40,6 +40,7 @@ function crudFactory(Model, { populate = null, sort = { createdAt: -1 }, lean = 
         res.status(201).json(item);
       } catch (err) {
         if (err.code === 11000) {
+          console.warn(`Duplicate key blocked a new ${Model.modelName}:`, JSON.stringify(err.keyPattern || {}));
           return res.status(409).json({ message: 'A record with these details already exists' });
         }
         res.status(400).json({ message: 'Failed to create record', error: err.message });
