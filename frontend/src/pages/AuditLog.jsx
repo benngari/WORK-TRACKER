@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react';
 import { ScrollText, ChevronDown, ChevronRight } from 'lucide-react';
 import api from '../api/axios';
+import { useToast } from '../context/ToastContext.jsx';
 import { TableSkeleton } from '../components/Skeletons.jsx';
 
 const ENTITIES = [
@@ -73,7 +74,29 @@ function KeyValues({ data }) {
   );
 }
 
-function Details({ log }) {
+function Details({ log, onRestored }) {
+  const toast = useToast();
+  const [restoring, setRestoring] = useState(false);
+  // only things that were deleted one at a time, and that we kept a full copy of, can be put back
+  const restorable =
+    log.type === 'delete' &&
+    log.method === 'DELETE' &&
+    !!(log.details && log.details.snapshot) &&
+    /^\/api\/(clients|sites|expenses|attendance|transport|historical)\/[a-f0-9]{24}$/i.test(log.path || '');
+
+  const restore = async () => {
+    if (!confirm(`Restore this ${log.entity === 'attendance' ? 'attendance record' : log.entity.replace(/s$/, '')}? It will be put back exactly as it was.`)) return;
+    setRestoring(true);
+    try {
+      await api.post(`/audit/${log._id}/restore`);
+      toast.success('Restored');
+      if (onRestored) onRestored();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Could not restore this');
+    } finally {
+      setRestoring(false);
+    }
+  };
   const d = log.details || {};
   const hasAny = d.changes || d.snapshot || d.fields || d.email;
   return (
@@ -107,6 +130,18 @@ function Details({ log }) {
       )}
       {d.email && <KeyValues data={{ email: d.email }} />}
       {!hasAny && <div className="text-xs text-slate-400">No extra details recorded.</div>}
+      {restorable && (
+        <div className="rounded-lg border border-slate-200 p-3 flex flex-wrap items-center justify-between gap-2">
+          <span className="text-xs text-slate-500">
+            {log.restoredAt ? `Restored on ${formatWhen(log.restoredAt)}` : 'This was deleted. You can bring it back exactly as it was.'}
+          </span>
+          {!log.restoredAt && (
+            <button type="button" disabled={restoring} onClick={restore} className="btn-primary">
+              {restoring ? 'Restoring...' : 'Restore'}
+            </button>
+          )}
+        </div>
+      )}
       <div className="text-[11px] text-slate-400">
         {log.method} {log.path} | status {log.status}
         {log.ip ? ` | IP ${log.ip}` : ''}
@@ -123,6 +158,7 @@ export default function AuditLog() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [expanded, setExpanded] = useState(null);
+  const [reload, setReload] = useState(0);
 
   const [search, setSearch] = useState('');
   const [entity, setEntity] = useState('');
@@ -150,7 +186,7 @@ export default function AuditLog() {
         .finally(() => setLoading(false));
     }, 300);
     return () => clearTimeout(timer);
-  }, [page, search, entity, type, from, to]);
+  }, [page, search, entity, type, from, to, reload]);
 
   return (
     <div className="space-y-4">
@@ -223,7 +259,10 @@ export default function AuditLog() {
                         {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                       </td>
                       <td className="py-2.5 px-4 whitespace-nowrap text-slate-500">{formatWhen(log.createdAt)}</td>
-                      <td className="py-2.5 px-4 text-ink-900">{log.action}</td>
+                      <td className="py-2.5 px-4 text-ink-900">
+                        {log.action}
+                        {log.restoredAt && <span className="ml-2 text-xs rounded-full bg-green-50 text-green-700 px-2 py-0.5">Restored</span>}
+                      </td>
                       <td className="py-2.5 px-4">
                         <span className={`text-xs font-medium rounded-full px-2 py-0.5 ${TYPE_STYLES[log.type] || TYPE_STYLES.other}`}>
                           {TYPE_LABELS[log.type] || 'Other'}
@@ -234,7 +273,7 @@ export default function AuditLog() {
                       <tr className="bg-slate-50 border-b border-slate-100">
                         <td></td>
                         <td colSpan={3} className="py-3 px-4">
-                          <Details log={log} />
+                          <Details log={log} onRestored={() => setReload((n) => n + 1)} />
                         </td>
                       </tr>
                     )}

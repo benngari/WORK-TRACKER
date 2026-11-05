@@ -1,6 +1,7 @@
 import api from '../api/axios';
+import { parseMpesaMessage } from './mpesaParseLocal.js';
 
-// Attendance and expenses recorded with no signal are kept on this phone and sent later.
+// Things recorded with no signal are kept on this phone and sent later, in the same order.
 const KEY = 'wt_offline_queue';
 const listeners = new Set();
 
@@ -42,6 +43,21 @@ const newRequestId = () =>
     ? crypto.randomUUID()
     : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
+// A database id made on the phone (4 bytes of time + 8 random bytes, like the server makes).
+// Because the phone knows the id before the server does, a new job and its first visit can be saved together with no signal.
+export function newObjectId() {
+  const time = Math.floor(Date.now() / 1000).toString(16).padStart(8, '0');
+  let random = '';
+  if (typeof crypto !== 'undefined' && crypto.getRandomValues) {
+    random = Array.from(crypto.getRandomValues(new Uint8Array(8)), (b) => b.toString(16).padStart(2, '0')).join('');
+  } else {
+    for (let i = 0; i < 16; i += 1) random += Math.floor(Math.random() * 16).toString(16);
+  }
+  return time + random;
+}
+
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false;
+
 function enqueue(url, body, label) {
   const items = readAll();
   items.push({ id: body.clientRequestId, user: currentUserId(), url, body, label: label || url, queuedAt: new Date().toISOString() });
@@ -52,7 +68,7 @@ function enqueue(url, body, label) {
 // Every request carries an id, so a retry can never create the same record twice.
 export async function postOrQueue(url, body, label) {
   const payload = { ...body, clientRequestId: body.clientRequestId || newRequestId() };
-  if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+  if (isOffline()) {
     enqueue(url, payload, label);
     return { queued: true };
   }
@@ -68,10 +84,54 @@ export async function postOrQueue(url, body, label) {
   }
 }
 
+// Sends several steps that depend on each other (for example: the job, then its first visit).
+// Once one step has to wait for a signal, every step after it waits too, so they are always sent in order.
+export async function postChain(steps) {
+  let waiting = isOffline();
+  const results = [];
+  for (const step of steps) {
+    const payload = { ...step.body, clientRequestId: step.body.clientRequestId || newRequestId() };
+    if (waiting) {
+      enqueue(step.url, payload, step.label);
+      results.push({ queued: true });
+      continue;
+    }
+    try {
+      const res = await api.post(step.url, payload, { noRetry: true, timeout: 10000 });
+      results.push({ queued: false, data: res.data });
+    } catch (err) {
+      if (err.response) throw err;
+      waiting = true;
+      enqueue(step.url, payload, step.label);
+      results.push({ queued: true });
+    }
+  }
+  return { queued: results.some((r) => r.queued), results };
+}
+
+// Reads a pasted M-PESA message. The server also checks it against what you already saved;
+// with no signal the phone reads it itself and the server checks for duplicates later, when it syncs.
+export async function parseMessage(message) {
+  const readHere = () => {
+    const p = parseMpesaMessage(message);
+    const parsed = { ...p, transactionDate: p.transactionDate ? p.transactionDate.toISOString() : null };
+    const alreadyQueued = pendingItems().some((i) => i.url === '/mpesa' && i.body && p.transactionCode && i.body.transactionCode === p.transactionCode);
+    return { parsed, duplicate: null, offline: true, queuedDuplicate: alreadyQueued };
+  };
+  if (isOffline()) return readHere();
+  try {
+    const { data } = await api.post('/mpesa/parse', { message }, { noRetry: true, timeout: 8000 });
+    return { parsed: data.parsed, duplicate: data.duplicate, offline: false, queuedDuplicate: false };
+  } catch (err) {
+    if (!err.response) return readHere();
+    throw err;
+  }
+}
+
 let flushing = false;
 
 export async function flushQueue() {
-  if (flushing || (typeof navigator !== 'undefined' && navigator.onLine === false)) return { sent: 0, failed: 0 };
+  if (flushing || isOffline()) return { sent: 0, failed: 0 };
   flushing = true;
   let sent = 0;
   let failed = 0;

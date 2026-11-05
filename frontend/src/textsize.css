@@ -1,0 +1,8 @@
+/* Text size choice (saved on the phone as wt_text_size). The app is sized in rem, so changing the root size scales everything. */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html.ts-sm { font-size: 93.75%; --wt-scale: 0.9375; }
+html.ts-lg { font-size: 112.5%; --wt-scale: 1.125; }
+html.ts-xl { font-size: 125%; --wt-scale: 1.25; }
+
+/* the few small labels sized in fixed pixels follow the same scale */
+.text-\[11px\] { font-size: calc(11px * var(--wt-scale, 1)); }

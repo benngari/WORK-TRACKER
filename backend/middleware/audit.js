@@ -209,6 +209,16 @@ module.exports = async function audit(req, res, next) {
       const label = labelOf(before) || labelOf(doc) || '';
       const entityId = idInPath || (doc && doc._id ? String(doc._id) : '');
 
+      // which job this belongs to, so the job's History tab can find it
+      const asId = (v) => {
+        const s = String((v && v._id) || v || '');
+        return ID_RE.test(s) ? s : '';
+      };
+      const jobRef =
+        segments[0] === 'jobs'
+          ? idInPath || asId(doc)
+          : asId(req.body && (req.body.job || req.body.jobId)) || asId(before && before.job) || asId(doc && doc.job);
+
       const details = {};
       if (label) details.label = label;
       if (info.type === 'update' && before && req.body && !['restore'].includes(segments[2])) {
@@ -234,6 +244,7 @@ module.exports = async function audit(req, res, next) {
         type: info.type,
         entity: segments[0] || '',
         entityId,
+        job: jobRef || null,
         method: req.method,
         path: req.originalUrl.split('?')[0],
         status,

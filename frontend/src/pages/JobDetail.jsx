@@ -5,8 +5,9 @@ import api from '../api/axios';
 import SiteLocationCard from '../components/SiteLocationCard.jsx';
 import { useSiteNames } from '../utils/useSiteNames.js';
 import JobExpensesTab from '../components/JobExpensesTab.jsx';
+import JobHistoryTab from '../components/JobHistoryTab.jsx';
 import WorkedTodayButton from '../components/WorkedToday.jsx';
-import { postOrQueue } from '../utils/offlineQueue.js';
+import { postOrQueue, parseMessage, postChain, newObjectId } from '../utils/offlineQueue.js';
 import { compressImage } from '../utils/compressImage.js';
 import { DetailSkeleton, RowsSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
@@ -15,7 +16,7 @@ import StatusBadge from '../components/StatusBadge.jsx';
 import { formatKES, formatDate, siteLabel, getThumbnailUrl, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 
-const tabs = ['Overview', 'Attendance', 'Payments', 'Expenses', 'Documents', 'Notes'];
+const tabs = ['Overview', 'Attendance', 'Payments', 'Expenses', 'Documents', 'Notes', 'History'];
 const UNDO_WINDOW_MS = 5000;
 
 export default function JobDetail() {
@@ -125,6 +126,7 @@ export default function JobDetail() {
       {tab === 'Attendance' && <AttendanceTab job={job} onChange={load} />}
       {tab === 'Payments' && <PaymentsTab job={job} onChange={load} />}
       {tab === 'Expenses' && <JobExpensesTab job={job} onChange={load} />}
+      {tab === 'History' && <JobHistoryTab job={job} />}
       {tab === 'Documents' && <DocumentsTab job={job} onChange={load} />}
       {tab === 'Notes' && <NotesTab job={job} onChange={load} />}
 
@@ -1220,10 +1222,14 @@ function QuickMpesaAdd({ job, onDone }) {
     setBusy(true);
     setError('');
     try {
-      const { data } = await api.post('/mpesa/parse', { message });
-      setParsed(data.parsed);
-      setDuplicate(data.duplicate);
-      setAllocAmount(suggestAmount(data.parsed.amount, type));
+      const result = await parseMessage(message);
+      if (result.queuedDuplicate) {
+        setError('This message is already saved on this phone and waiting to sync.');
+        return;
+      }
+      setParsed(result.parsed);
+      setDuplicate(result.duplicate);
+      setAllocAmount(suggestAmount(result.parsed.amount, type));
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to read message');
     } finally {
@@ -1240,6 +1246,7 @@ function QuickMpesaAdd({ job, onDone }) {
     setBusy(true);
     setError('');
     try {
+      const steps = [];
       let paymentId;
       if (duplicate) {
         // Already saved before: reuse its payment record instead of creating a duplicate
@@ -1248,29 +1255,42 @@ function QuickMpesaAdd({ job, onDone }) {
         if (!existing) throw new Error('This code exists but has no payment record. Check the M-PESA Payments page.');
         paymentId = existing._id;
       } else {
-        const { data: tx } = await api.post('/mpesa', {
-          transactionCode: parsed.transactionCode,
-          amount: parsed.amount,
-          sender: parsed.sender,
-          transactionDate: parsed.transactionDate,
-          mpesaBalance: parsed.mpesaBalance,
-          originalMessage: parsed.originalMessage,
-          parsedSuccessfully: parsed.parsedSuccessfully,
+        // new ids are made on the phone, so all three steps can be saved together when there is no signal
+        const txId = newObjectId();
+        paymentId = newObjectId();
+        steps.push({
+          url: '/mpesa',
+          body: {
+            _id: txId,
+            transactionCode: parsed.transactionCode,
+            amount: parsed.amount,
+            sender: parsed.sender,
+            transactionDate: parsed.transactionDate,
+            mpesaBalance: parsed.mpesaBalance,
+            originalMessage: parsed.originalMessage,
+            parsedSuccessfully: parsed.parsedSuccessfully,
+          },
+          label: `M-PESA ${parsed.transactionCode} - KES ${parsed.amount}`,
         });
-        const { data: payment } = await api.post('/payments', {
-          method: 'M-PESA',
-          mpesaTransaction: tx._id,
-          amount: tx.amount,
-          receivedDate: tx.transactionDate || new Date(),
+        steps.push({
+          url: '/payments',
+          body: {
+            _id: paymentId,
+            method: 'M-PESA',
+            mpesaTransaction: txId,
+            amount: parsed.amount,
+            receivedDate: parsed.transactionDate || new Date().toISOString(),
+          },
+          label: `Payment for ${parsed.transactionCode}`,
         });
-        paymentId = payment._id;
       }
-      await api.post(`/payments/${paymentId}/allocate`, {
-        jobId: job._id,
-        amount: Number(allocAmount),
-        allocationType: type,
+      steps.push({
+        url: `/payments/${paymentId}/allocate`,
+        body: { jobId: job._id, amount: Number(allocAmount), allocationType: type },
+        label: `Allocate KES ${Number(allocAmount)} to a job`,
       });
-      toast.success('M-PESA payment added and allocated');
+      const outcome = await postChain(steps);
+      toast.success(outcome.queued ? 'No signal - saved on this phone, it will sync when you are online' : 'M-PESA payment added and allocated');
       reset();
       setOpen(false);
       onDone();

@@ -9,6 +9,7 @@ import { SortTh, useSort } from '../components/SortHeader.jsx';
 import { formatKES, formatDate, siteLabel } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
 import WorkedTodayButton from '../components/WorkedToday.jsx';
+import { postChain, newObjectId } from '../utils/offlineQueue.js';
 
 const emptyForm = {
   client: '', site: '', jobCardRef: '', jobType: '', description: '',
@@ -89,37 +90,43 @@ export default function Jobs() {
     setError('');
     try {
       const { client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes } = form;
-      const { data: job } = await api.post('/jobs', {
-        client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes,
-        extraSites: form.extraSites || [],
-        multiSiteMode: form.multiSiteMode || 'oneDay',
-        expectedPaymentOverride: form.wholeJob && form.jobTotal !== '' && form.jobTotal != null ? Number(form.jobTotal) : null,
-      });
+      const jobId = newObjectId();
+      const steps = [
+        {
+          url: '/jobs',
+          body: {
+            _id: jobId,
+            client, site, jobCardRef, jobType, description, status, rate, paymentDueDate, notes,
+            extraSites: form.extraSites || [],
+            multiSiteMode: form.multiSiteMode || 'oneDay',
+            expectedPaymentOverride: form.wholeJob && form.jobTotal !== '' && form.jobTotal != null ? Number(form.jobTotal) : null,
+          },
+          label: 'New job',
+        },
+      ];
 
       // several sites on the first visit: one day for all of them, or one day for each site
       const extraSiteIds = form.extraSites || [];
       const visitedSiteIds = [site, ...extraSiteIds];
       if (extraSiteIds.length && (form.multiSiteMode || 'oneDay') === 'perSite') {
         for (let i = 0; i < visitedSiteIds.length; i += 1) {
-          await api.post('/attendance', {
-            job: job._id,
-            date: form.date,
-            rate: form.rate,
-            fare: i === 0 ? form.fare : 0,
-            sites: [visitedSiteIds[i]],
+          steps.push({
+            url: '/attendance',
+            body: { job: jobId, date: form.date, rate: form.rate, fare: i === 0 ? form.fare : 0, sites: [visitedSiteIds[i]] },
+            label: 'First visit',
           });
         }
       } else {
-        await api.post('/attendance', {
-          job: job._id,
-          date: form.date,
-          rate: form.rate,
-          fare: form.fare,
-          sites: extraSiteIds.length ? visitedSiteIds : undefined,
+        steps.push({
+          url: '/attendance',
+          body: { job: jobId, date: form.date, rate: form.rate, fare: form.fare, sites: extraSiteIds.length ? visitedSiteIds : undefined },
+          label: 'First visit',
         });
       }
 
-      toast.success('Job created');
+      // with no signal the job and its first visit are saved on the phone, in order, and sent later
+      const outcome = await postChain(steps);
+      toast.success(outcome.queued ? 'No signal - the job is saved on this phone and will sync when you are online' : 'Job created');
       setModalOpen(false);
       setForm(emptyForm);
       load();
@@ -511,18 +518,26 @@ function RepeatJobModal({ job, onClose, onDone }) {
     setSaving(true);
     setError('');
     try {
-      const { data: newJob } = await api.post('/jobs', {
-        client: job.client?._id,
-        site: job.site?._id,
-        jobCardRef: job.jobCardRef,
-        jobType: job.jobType,
-        description: job.description,
-        status: 'Open',
-        rate: job.rate,
-        paymentDueDate: '',
-      });
-      await api.post('/attendance', { job: newJob._id, date, rate: job.rate, fare });
-      toast.success('Job repeated');
+      const newJobId = newObjectId();
+      const outcome = await postChain([
+        {
+          url: '/jobs',
+          body: {
+            _id: newJobId,
+            client: job.client?._id,
+            site: job.site?._id,
+            jobCardRef: job.jobCardRef,
+            jobType: job.jobType,
+            description: job.description,
+            status: 'Open',
+            rate: job.rate,
+            paymentDueDate: '',
+          },
+          label: 'Repeated job',
+        },
+        { url: '/attendance', body: { job: newJobId, date, rate: job.rate, fare }, label: 'First visit' },
+      ]);
+      toast.success(outcome.queued ? 'No signal - saved on this phone, it will sync when you are online' : 'Job repeated');
       onClose();
       onDone();
     } catch (err) {

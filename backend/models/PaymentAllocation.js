@@ -13,10 +13,12 @@ const allocationSchema = new mongoose.Schema(
     // payment calculation, per the "don't mix fare with earnings" rule).
     allocationType: { type: String, enum: ['Payment', 'Fare'], default: 'Payment' },
     notes: { type: String, trim: true },
+    clientRequestId: { type: String, trim: true }, // stops an offline retry counting the same allocation twice
   },
   { timestamps: true }
 );
 
 allocationSchema.index({ owner: 1, job: 1 });
+allocationSchema.index({ owner: 1, clientRequestId: 1 }, { sparse: true });
 
 module.exports = mongoose.model('PaymentAllocation', allocationSchema);

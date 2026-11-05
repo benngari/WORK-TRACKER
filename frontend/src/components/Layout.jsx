@@ -20,6 +20,7 @@ const titles = {
   '/historical': 'Historical Records',
   '/trash': 'Trash',
   '/audit': 'Audit Log',
+  '/health': 'Data Health',
   '/settings': 'Settings',
 };
 

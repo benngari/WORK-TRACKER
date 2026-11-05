@@ -27,6 +27,7 @@ const SettingsPage = lazy(() => import('./pages/Settings.jsx'));
 const AttendanceHistory = lazy(() => import('./pages/AttendanceHistory.jsx'));
 const Trash = lazy(() => import('./pages/Trash.jsx'));
 const AuditLog = lazy(() => import('./pages/AuditLog.jsx'));
+const DataHealth = lazy(() => import('./pages/DataHealth.jsx'));
 
 function Lazy({ children, fallback }) {
   return <Suspense fallback={fallback || <TableSkeleton rows={5} />}>{children}</Suspense>;
@@ -71,6 +72,7 @@ export default function App() {
         <Route path="historical" element={<Lazy><HistoricalRecords /></Lazy>} />
         <Route path="trash" element={<Lazy><Trash /></Lazy>} />
         <Route path="audit" element={<Lazy><AuditLog /></Lazy>} />
+        <Route path="health" element={<Lazy><DataHealth /></Lazy>} />
         <Route path="settings" element={<Lazy><SettingsPage /></Lazy>} />
       </Route>
 

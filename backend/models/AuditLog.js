@@ -8,6 +8,8 @@ const auditLogSchema = new mongoose.Schema(
     type: { type: String, enum: ['create', 'update', 'delete', 'auth', 'other'], default: 'other' },
     entity: { type: String, default: '' }, // jobs, clients, mpesa, payments ...
     entityId: { type: String, default: '' },
+    job: { type: mongoose.Schema.Types.ObjectId, ref: 'Job', default: null, index: true }, // the job this belongs to, if any
+    restoredAt: { type: Date, default: null }, // set when a deleted item is brought back
     method: { type: String, default: '' },
     path: { type: String, default: '' },
     status: { type: Number, default: 0 },

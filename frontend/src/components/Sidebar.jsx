@@ -3,7 +3,7 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Briefcase, Building2, MapPin, CalendarCheck, Table2, Smartphone,
   AlertCircle, FileText, CalendarDays, BarChart3, Archive, Trash2, Settings, Wallet,
-  Receipt, FileSpreadsheet, ScrollText,
+  Receipt, FileSpreadsheet, ScrollText, Activity,
 } from 'lucide-react';
 import api from '../api/axios';
 
@@ -24,6 +24,7 @@ const navItems = [
   { to: '/historical', label: 'Historical Records', icon: Archive },
   { to: '/trash', label: 'Trash', icon: Trash2 },
   { to: '/audit', label: 'Audit Log', icon: ScrollText },
+  { to: '/health', label: 'Data Health', icon: Activity },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
 

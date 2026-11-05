@@ -148,6 +148,11 @@ exports.getOne = async (req, res) => {
 
 exports.create = async (req, res) => {
   try {
+    // a job saved on a phone with no signal can be sent twice - return the one already saved
+    if (req.body._id) {
+      const already = await Job.findOne({ _id: req.body._id, owner: req.user.id });
+      if (already) return res.status(200).json(already);
+    }
     const job = await Job.create({ ...req.body, owner: req.user.id });
     res.status(201).json(job);
   } catch (err) {

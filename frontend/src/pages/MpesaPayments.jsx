@@ -7,6 +7,7 @@ import { TableSkeleton } from '../components/Skeletons.jsx';
 import Modal from '../components/Modal.jsx';
 import { formatKES, formatDate, siteLabel, toNairobiInput, fromNairobiInput } from '../utils/format.js';
 import { useToast } from '../context/ToastContext.jsx';
+import { parseMessage, postChain, newObjectId } from '../utils/offlineQueue.js';
 
 export default function MpesaPayments() {
   const toast = useToast();
@@ -248,6 +249,8 @@ function ManualPaymentModal({ open, onClose, onSaved }) {
 }
 
 function PasteParseModal({ open, onClose, onSaved }) {
+  const toast = useToast();
+  const [offlineNote, setOfflineNote] = useState('');
   const [step, setStep] = useState('paste'); // paste -> review
   const [message, setMessage] = useState('');
   const [parsed, setParsed] = useState(null);
@@ -270,9 +273,14 @@ function PasteParseModal({ open, onClose, onSaved }) {
     setParsing(true);
     setError('');
     try {
-      const { data } = await api.post('/mpesa/parse', { message });
-      setParsed(data.parsed);
-      setDuplicate(data.duplicate);
+      const result = await parseMessage(message);
+      if (result.queuedDuplicate) {
+        setError('This message is already saved on this phone and waiting to sync.');
+        return;
+      }
+      setParsed(result.parsed);
+      setDuplicate(result.duplicate);
+      setOfflineNote(result.offline ? 'No signal: your phone read the message. It will be checked for duplicates when it syncs.' : '');
       setStep('review');
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to parse message');
@@ -285,32 +293,46 @@ function PasteParseModal({ open, onClose, onSaved }) {
     setSaving(true);
     setError('');
     try {
-      const { data: tx } = await api.post('/mpesa', {
-        transactionCode: parsed.transactionCode,
-        amount: parsed.amount,
-        sender: parsed.sender,
-        transactionDate: parsed.transactionDate,
-        mpesaBalance: parsed.mpesaBalance,
-        originalMessage: parsed.originalMessage,
-        parsedSuccessfully: parsed.parsedSuccessfully,
-      });
+      const txId = newObjectId();
+      const outcome = await postChain([
+        {
+          url: '/mpesa',
+          body: {
+            _id: txId,
+            transactionCode: parsed.transactionCode,
+            amount: parsed.amount,
+            sender: parsed.sender,
+            transactionDate: parsed.transactionDate,
+            mpesaBalance: parsed.mpesaBalance,
+            originalMessage: parsed.originalMessage,
+            parsedSuccessfully: parsed.parsedSuccessfully,
+          },
+          label: `M-PESA ${parsed.transactionCode} - KES ${parsed.amount}`,
+        },
+        {
+          url: '/payments',
+          body: {
+            _id: newObjectId(),
+            method: 'M-PESA',
+            mpesaTransaction: txId,
+            amount: parsed.amount,
+            receivedDate: parsed.transactionDate || new Date().toISOString(),
+          },
+          label: `Payment for ${parsed.transactionCode}`,
+        },
+      ]);
 
-      if (proofFile) {
+      if (outcome.queued) {
+        toast.success(proofFile ? 'No signal - saved on this phone. Add the proof photo later, when you are online.' : 'No signal - saved on this phone, it will sync when you are online');
+      } else if (proofFile) {
         const formData = new FormData();
         formData.append('file', proofFile);
         formData.append('category', 'M-PESA Proof');
         const { data: doc } = await api.post('/documents/upload', formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
         });
-        await api.put(`/mpesa/${tx._id}`, { proofDocument: { url: doc.url, publicId: doc.publicId } });
+        await api.put(`/mpesa/${txId}`, { proofDocument: { url: doc.url, publicId: doc.publicId } });
       }
-
-      await api.post('/payments', {
-        method: 'M-PESA',
-        mpesaTransaction: tx._id,
-        amount: tx.amount,
-        receivedDate: tx.transactionDate || new Date(),
-      });
 
       onSaved();
       onClose();
@@ -325,6 +347,7 @@ function PasteParseModal({ open, onClose, onSaved }) {
   return (
     <Modal open={open} onClose={() => { onClose(); reset(); }} title="Add M-PESA Payment" wide>
       {error && <div className="text-sm bg-red-50 text-red-600 rounded-lg px-3 py-2 mb-3">{error}</div>}
+      {offlineNote && <div className="text-sm bg-amber-50 text-amber-700 rounded-lg px-3 py-2 mb-3">{offlineNote}</div>}
 
       {step === 'paste' && (
         <div className="space-y-3">
